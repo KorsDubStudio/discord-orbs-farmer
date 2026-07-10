@@ -2,85 +2,68 @@
   <img src="assets/kds-logo.svg" alt="KDStudio" width="120"/>
 </p>
 
-# 🔥 Discord Orbs Farmer v4.2 STEALTH
+# 🔥 Discord Orbs Farmer v4.3 STEALTH
 
 ### 👑 Создатель / Creator: **KDStudio**
-🔗 Репозиторий: [github.com/KorsDubStudio/discord-orbs-farmer](https://github.com/KorsDubStudio/discord-orbs-farmer)
+🔗 https://github.com/KorsDubStudio/discord-orbs-farmer
 
 ---
 
 ## ⚠️ ТОЛЬКО В ОБРАЗОВАТЕЛЬНЫХ ЦЕЛЯХ / FOR EDUCATIONAL PURPOSES ONLY
 
-Этот скрипт создан **исключительно** для изучения внутреннего API Discord, механики квестов и клиентской автоматизации.  
-Использование автоматизации квестов **нарушает Terms of Service Discord**.  
-Discord с апреля 2026 активно детектит и банит такие действия.  
-
-**Автор (KDStudio) и этот репозиторий НЕ несут никакой ответственности** за баны, потери аккаунтов, captcha или любые другие последствия.  
-Используй **только на свой страх и риск**, желательно на тестовом/альтернативном аккаунте.
+Этот скрипт создан **исключительно** для изучения внутреннего API Discord и механики квестов.  
+Использование автоматизации **нарушает Terms of Service Discord**.  
+**Автор (KDStudio) не несёт ответственности** за баны и любые последствия.  
+Используй только на свой страх и риск.
 
 ---
 
-<p align="center">
-  <img src="assets/preview.svg" alt="Orbs Farmer STEALTH UI Preview" width="360"/>
-</p>
+## ✨ Что нового в v4.3
 
-> ⚠️ **Educational use only. Risk of permanent Discord ban. You have been warned.**
-
----
-
-## ✨ Возможности
-
-- ✅ **Авто-принятие квестов** (JIT)
-- ✅ **Кнопка СТОП** + **кнопка ✕** (полное закрытие + cleanup)
-- ✅ Все типы: Video / Play / Stream / Activity
-- ✅ **Stealth-режим** 3 уровней
-- ✅ UI-панель с брендингом **KDStudio**
-- ✅ Ограничение квестов + случайные паузы
-- ✅ Медленный «человечный» прогресс
-- ✅ `window.closeOrbsFarmer()`
+- ⚙ **Полноценная панель настроек** прямо в UI
+- ⚡ / ⚖ / 🛡 **Три пресета**: Макс. скорость (риск) · Баланс · Макс. безопасность
+- Ползунки: скорость видео, лимит квестов
+- Чекбоксы: авто-принятие, auto-claim (рискованно), сначала видео
+- Кнопка **✕** — полное закрытие + cleanup
+- Брендинг **KDStudio** + watermark
 
 ---
 
 ## 🚀 Как использовать
 
 1. Discord Desktop / Vesktop / Equicord
-2. `Ctrl + Shift + I` → Console
-3. `allow pasting` → Enter
-4. Вставь код из [`discord-orbs-farm-stealth.js`](./discord-orbs-farm-stealth.js)
+2. `Ctrl+Shift+I` → Console → `allow pasting`
+3. Вставь код из файла `discord-orbs-farm-stealth.js`
+4. Открой **⚙ Настройки** и выбери режим
 5. **СТАРТ** → **✕** чтобы закрыть
 
 ---
 
-## 🛡 Анти-theft / Credits
+## ⚙ Режимы
 
-- © **2026 KDStudio**. All rights reserved.
-- **Запрещено** удалять кредиты, логотип и упоминание автора.
-- **Запрещено** выдавать скрипт за свой продукт / продавать без разрешения.
-- При любом использовании, модификации или публикации **обязательно** оставляй:
-  > Created by **KDStudio** · https://github.com/KorsDubStudio/discord-orbs-farmer
+| Режим | Скорость | Паузы | Квестов | Риск |
+|-------|----------|-------|---------|------|
+| 1 ⚡ Макс. скорость | очень быстро | 8–25 с | до 8 | высокий |
+| 2 ⚖ Баланс | средне | 45–120 с | 4 | средний |
+| 3 🛡 Макс. безопасность | медленно | 90–240 с | 2 | низкий |
 
-Скрипт содержит постоянный watermark и credits в UI и в исходном коде.  
-Удаление credits = нарушение условий.
+Можно крутить ползунки вручную после выбора пресета.
 
 ---
 
-## ⚠️ Disclaimer
+## 🛡 Credits & Anti-theft
 
-**FOR EDUCATIONAL PURPOSES ONLY.**  
-Automating Discord Quests violates Discord's Terms of Service.  
-The author (KDStudio) takes **no responsibility** for any bans or consequences.  
-Use at your own risk.
+© 2026 **KDStudio**.  
+Запрещено удалять кредиты и выдавать скрипт за свой.  
+При использовании/модификации обязательно указывай:  
+**Created by KDStudio** · https://github.com/KorsDubStudio/discord-orbs-farmer
 
 ---
 
 ## 📜 License
 
-MIT with **mandatory attribution** to KDStudio.
+MIT with mandatory attribution to KDStudio.
 
 ---
 
-<p align="center">
-  <b>Made with ❤️ by KDStudio</b><br>
-  <a href="https://github.com/KorsDubStudio">github.com/KorsDubStudio</a> · 
-  <a href="https://www.youtube.com/@KORS_DUB">YouTube</a>
-</p>
+<p align="center"><b>Made with ❤️ by KDStudio</b></p>
