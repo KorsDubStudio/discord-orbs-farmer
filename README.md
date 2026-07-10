@@ -1,78 +1,86 @@
-# 🔥 Discord Orbs Farmer v4.1 STEALTH
+<p align="center">
+  <img src="assets/kds-logo.svg" alt="KDStudio" width="120"/>
+</p>
 
-**ТОЛЬКО В ОБРАЗОВАТЕЛЬНЫХ ЦЕЛЯХ / FOR EDUCATIONAL PURPOSES ONLY**
+# 🔥 Discord Orbs Farmer v4.2 STEALTH
+
+### 👑 Создатель / Creator: **KDStudio**
+🔗 Репозиторий: [github.com/KorsDubStudio/discord-orbs-farmer](https://github.com/KorsDubStudio/discord-orbs-farmer)
+
+---
+
+## ⚠️ ТОЛЬКО В ОБРАЗОВАТЕЛЬНЫХ ЦЕЛЯХ / FOR EDUCATIONAL PURPOSES ONLY
 
 Этот скрипт создан **исключительно** для изучения внутреннего API Discord, механики квестов и клиентской автоматизации.  
 Использование автоматизации квестов **нарушает Terms of Service Discord**.  
 Discord с апреля 2026 активно детектит и банит такие действия.  
-**Автор, репозиторий и все связанные лица НЕ несут никакой ответственности** за баны, потери аккаунтов, captcha или любые другие последствия.  
+
+**Автор (KDStudio) и этот репозиторий НЕ несут никакой ответственности** за баны, потери аккаунтов, captcha или любые другие последствия.  
 Используй **только на свой страх и риск**, желательно на тестовом/альтернативном аккаунте.
 
 ---
 
 <p align="center">
-  <img src="assets/preview.svg" alt="Orbs Farmer STEALTH UI Preview" width="380"/>
+  <img src="assets/preview.svg" alt="Orbs Farmer STEALTH UI Preview" width="360"/>
 </p>
 
 > ⚠️ **Educational use only. Risk of permanent Discord ban. You have been warned.**
 
 ---
 
-## ✨ Возможности v4.1
+## ✨ Возможности
 
-- ✅ **Авто-принятие квестов** (JIT — принимает только перед выполнением)
-- ✅ **Кнопка СТОП** — останавливает текущий фарм
-- ✅ **Кнопка ✕ (Закрыть)** — полностью останавливает скрипт, убирает панель и чистит все spoof'ы
-- ✅ Поддержка всех типов квестов (Video / Play / Stream / Activity)
+- ✅ **Авто-принятие квестов** (JIT)
+- ✅ **Кнопка СТОП** + **кнопка ✕** (полное закрытие + cleanup)
+- ✅ Все типы: Video / Play / Stream / Activity
 - ✅ **Stealth-режим** 3 уровней
-- ✅ Плавающая UI-панель (прогресс, список, Старт/Стоп/Закрыть)
-- ✅ Ограничение количества квестов за сессию
-- ✅ Большие случайные паузы + медленный «человечный» прогресс
-- ✅ Авто-claim выключен по умолчанию
-- ✅ Работает в Discord Desktop / Vesktop / Equicord / Vencord
+- ✅ UI-панель с брендингом **KDStudio**
+- ✅ Ограничение квестов + случайные паузы
+- ✅ Медленный «человечный» прогресс
+- ✅ `window.closeOrbsFarmer()`
 
 ---
 
 ## 🚀 Как использовать
 
-1. Открой **Discord Desktop** (или Vesktop / Equicord)
-2. Перейди в **Quests**
-3. `Ctrl + Shift + I` → **Console**
-4. `allow pasting` → Enter
-5. Скопируй **полный** код из [`discord-orbs-farm-stealth.js`](./discord-orbs-farm-stealth.js) (raw)
-6. Вставь → Enter
-7. Появится панель → **СТАРТ**
-8. **✕** — полностью закрыть и очистить
-
-Также можно закрыть из консоли: `window.closeOrbsFarmer()`
+1. Discord Desktop / Vesktop / Equicord
+2. `Ctrl + Shift + I` → Console
+3. `allow pasting` → Enter
+4. Вставь код из [`discord-orbs-farm-stealth.js`](./discord-orbs-farm-stealth.js)
+5. **СТАРТ** → **✕** чтобы закрыть
 
 ---
 
-## ⚙️ Основные настройки
+## 🛡 Анти-theft / Credits
 
-```js
-STEALTH_LEVEL: 2,              // 1 = быстрее, 2 = баланс, 3 = очень осторожно
-MAX_QUESTS_PER_SESSION: 4,
-AUTO_ENROLL: true,
-AUTO_CLAIM: false,             // лучше вручную
-```
+- © **2026 KDStudio**. All rights reserved.
+- **Запрещено** удалять кредиты, логотип и упоминание автора.
+- **Запрещено** выдавать скрипт за свой продукт / продавать без разрешения.
+- При любом использовании, модификации или публикации **обязательно** оставляй:
+  > Created by **KDStudio** · https://github.com/KorsDubStudio/discord-orbs-farmer
+
+Скрипт содержит постоянный watermark и credits в UI и в исходном коде.  
+Удаление credits = нарушение условий.
 
 ---
 
-## ⚠️ Disclaimer (ещё раз)
+## ⚠️ Disclaimer
 
 **FOR EDUCATIONAL PURPOSES ONLY.**  
-This project is intended solely for learning how Discord quests and client-side modules work.  
-Automating quests is against Discord's Terms of Service.  
-The author and this repository take **no responsibility** for any bans, account losses, or other consequences.  
+Automating Discord Quests violates Discord's Terms of Service.  
+The author (KDStudio) takes **no responsibility** for any bans or consequences.  
 Use at your own risk.
 
 ---
 
-## 📜 Лицензия
+## 📜 License
 
-MIT — do whatever you want, but at your own risk and only for educational purposes.
+MIT with **mandatory attribution** to KDStudio.
 
 ---
 
-**Сделано для сообщества** · Если помогло — поставь ⭐
+<p align="center">
+  <b>Made with ❤️ by KDStudio</b><br>
+  <a href="https://github.com/KorsDubStudio">github.com/KorsDubStudio</a> · 
+  <a href="https://www.youtube.com/@KORS_DUB">YouTube</a>
+</p>
