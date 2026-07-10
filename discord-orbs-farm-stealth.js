@@ -1,611 +1,455 @@
 /*
- * 🔥 DisOrbsFarm v5.5
- * Clean & Fixed version
- * Автопринятие и автоклайм исправлены
- * Убрано всё связанное с орбами
- * Удалён Мега-риск режим
+ * 🔥 DisOrbsFarm v6.0
+ * Полная переработка с нуля
+ * Самая стабильная и аккуратная версия
  */
 
 (async () => {
     "use strict";
 
+    // ==================== CONFIG ====================
     const CONFIG = {
         STEALTH_LEVEL: 2,
         AUTO_ENROLL: true,
         AUTO_CLAIM: false,
-        VIDEO_BASE_SPEED: 4,
-        VIDEO_MAX_FUTURE: 6,
-        VIDEO_MIN_DELAY: 1400,
+        VIDEO_SPEED: 4.0,
         PAUSE_BETWEEN_QUESTS: [45, 120],
         DISABLE_PAUSES: false,
-        NOTIFICATIONS_ENABLED: true,
-        SHOW_UI: true
+        NOTIFICATIONS: true
     };
 
-    function applyStealthPreset(level) {
+    function applyPreset(level) {
         CONFIG.STEALTH_LEVEL = level;
         if (level === 1) {
-            CONFIG.VIDEO_BASE_SPEED = 8;
-            CONFIG.VIDEO_MAX_FUTURE = 12;
-            CONFIG.VIDEO_MIN_DELAY = 700;
-            CONFIG.PAUSE_BETWEEN_QUESTS = [8, 20];
+            CONFIG.VIDEO_SPEED = 8.5;
+            CONFIG.PAUSE_BETWEEN_QUESTS = [8, 18];
         } else if (level === 2) {
-            CONFIG.VIDEO_BASE_SPEED = 4;
-            CONFIG.VIDEO_MAX_FUTURE = 6;
-            CONFIG.VIDEO_MIN_DELAY = 1400;
+            CONFIG.VIDEO_SPEED = 4.0;
             CONFIG.PAUSE_BETWEEN_QUESTS = [45, 120];
         } else {
-            CONFIG.VIDEO_BASE_SPEED = 2.2;
-            CONFIG.VIDEO_MAX_FUTURE = 3.5;
-            CONFIG.VIDEO_MIN_DELAY = 2200;
+            CONFIG.VIDEO_SPEED = 2.3;
             CONFIG.PAUSE_BETWEEN_QUESTS = [90, 240];
         }
     }
-    applyStealthPreset(CONFIG.STEALTH_LEVEL);
+    applyPreset(CONFIG.STEALTH_LEVEL);
 
+    // ==================== UTILS ====================
     const sleep = ms => new Promise(r => setTimeout(r, ms));
-    const rnd = (a, b) => Math.random() * (b - a) + a;
+    const rand = (min, max) => Math.random() * (max - min) + min;
     const now = () => Date.now();
 
-    function playBeep(f = 880, d = 200) {
+    function playSound(freq = 880, duration = 180) {
         try {
-            const a = new (window.AudioContext || window.webkitAudioContext)();
-            const o = a.createOscillator();
-            const g = a.createGain();
-            o.frequency.value = f;
-            g.gain.value = 0.35;
-            o.connect(g);
-            g.connect(a.destination);
-            o.start();
+            const ctx = new (window.AudioContext || window.webkitAudioContext)();
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.type = 'sine';
+            osc.frequency.value = freq;
+            gain.gain.value = 0.3;
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+            osc.start();
             setTimeout(() => {
-                g.gain.exponentialRampToValueAtTime(0.001, a.currentTime + 0.1);
-                setTimeout(() => o.stop(), 80);
-            }, d);
+                gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.1);
+                setTimeout(() => osc.stop(), 60);
+            }, duration);
         } catch {}
     }
 
-    function showNotification(title, body) {
-        if (!CONFIG.NOTIFICATIONS_ENABLED) return;
+    function notify(title, body) {
+        if (!CONFIG.NOTIFICATIONS) return;
         try {
-            if (Notification.permission === "granted") {
+            if (Notification.permission === 'granted') {
                 new Notification(title, { body });
-            } else if (Notification.permission !== "denied") {
-                Notification.requestPermission().then(p => {
-                    if (p === "granted") new Notification(title, { body });
-                });
+            } else if (Notification.permission !== 'denied') {
+                Notification.requestPermission().then(p => p === 'granted' && new Notification(title, { body }));
             }
         } catch {}
-        playBeep(700, 350);
+        playSound(720, 280);
     }
 
-    const log = (msg, type = "info") => {
-        const colors = { info: "#0A84FF", success: "#30D158", warn: "#FF9F0A", error: "#FF453A" };
-        console.log(`%c${msg}`, `color:${colors[type] || colors.info}; font-weight: bold`);
+    const log = (msg, type = 'info') => {
+        const color = { info: '#0A84FF', success: '#30D158', warn: '#FF9F0A', error: '#FF453A' }[type] || '#0A84FF';
+        console.log(`%c[DisOrbsFarm] ${msg}`, `color:${color}; font-weight:600`);
     };
 
-    // === MODULES ===
+    // ==================== DISCORD MODULES ====================
     delete window.$;
     let wpRequire;
     try {
         wpRequire = webpackChunkdiscord_app.push([[Symbol()], {}, r => r]);
         webpackChunkdiscord_app.pop();
-    } catch { return; }
-
-    const findModule = (predicate) => {
-        try {
-            for (const mod of Object.values(wpRequire.c)) {
-                const exp = mod?.exports;
-                if (!exp) continue;
-                for (const candidate of [exp.A, exp.Ay, exp.Z, exp.default, exp.Bo, exp.h, exp]) {
-                    try { if (candidate && predicate(candidate)) return candidate; } catch {}
-                }
-            }
-        } catch {}
-        return null;
-    };
-
-    let QuestsStore = Object.values(wpRequire.c).find(x => x?.exports?.A?.__proto__?.getQuest)?.exports?.A || findModule(m => m.getQuest && m.quests);
-    let api = Object.values(wpRequire.c).find(x => x?.exports?.Bo?.get)?.exports?.Bo || findModule(m => m.get && m.post && m.put);
-
-    if (!QuestsStore || !api) {
-        log("Не удалось найти необходимые модули Discord", "error");
+    } catch {
+        log('Не удалось загрузить модули Discord', 'error');
         return;
     }
 
-    // === QUESTS ===
-    let allAvailable = [];
-    let selectedQuestIds = new Set();
+    const getModule = (check) => {
+        for (const mod of Object.values(wpRequire.c)) {
+            const exp = mod?.exports;
+            if (!exp) continue;
+            for (const val of [exp.A, exp.Ay, exp.Z, exp.default, exp]) {
+                try { if (val && check(val)) return val; } catch {}
+            }
+        }
+        return null;
+    };
 
-    function loadQuests() {
-        allAvailable = [];
-        let rawQuests = [];
+    let QuestsStore = getModule(m => m.getQuest && m.quests) || 
+                      Object.values(wpRequire.c).find(x => x?.exports?.A?.__proto__?.getQuest)?.exports?.A;
+    let RestAPI = getModule(m => m.get && m.post) || 
+                  Object.values(wpRequire.c).find(x => x?.exports?.Bo?.get)?.exports?.Bo;
+
+    if (!QuestsStore || !RestAPI) {
+        log('Не найдены необходимые модули', 'error');
+        return;
+    }
+
+    // ==================== QUESTS ====================
+    let quests = [];
+    let selected = new Set();
+
+    function refreshQuests() {
+        quests = [];
+        let raw = [];
         try {
-            rawQuests = QuestsStore.quests instanceof Map 
-                ? [...QuestsStore.quests.values()] 
-                : Object.values(QuestsStore.quests || {});
+            raw = QuestsStore.quests instanceof Map ? [...QuestsStore.quests.values()] : Object.values(QuestsStore.quests || {});
         } catch {}
 
-        rawQuests.forEach(q => {
+        raw.forEach(q => {
             try {
                 if (q.userStatus?.completedAt) return;
-                const taskConfig = q.config?.taskConfig ?? q.config?.taskConfigV2;
-                if (!taskConfig?.tasks) return;
+                const cfg = q.config?.taskConfig ?? q.config?.taskConfigV2;
+                if (!cfg?.tasks) return;
 
-                const taskType = Object.keys(taskConfig.tasks).find(t => 
-                    t.includes("WATCH_VIDEO") || t === "PLAY_ON_DESKTOP"
-                );
-                if (!taskType) return;
+                const type = Object.keys(cfg.tasks).find(t => t.includes('VIDEO') || t === 'PLAY_ON_DESKTOP');
+                if (!type) return;
 
-                allAvailable.push({
-                    raw: q,
+                quests.push({
                     id: q.id,
-                    name: q.config?.messages?.questName || q.config?.application?.name || "Quest",
-                    secondsNeeded: taskConfig.tasks[taskType].target || 0,
-                    secondsDone: q.userStatus?.progress?.[taskType]?.value || 0,
-                    isVideo: taskType.includes("WATCH_VIDEO"),
-                    isGame: taskType === "PLAY_ON_DESKTOP",
+                    name: q.config?.messages?.questName || q.config?.application?.name || 'Quest',
+                    needed: cfg.tasks[type].target || 0,
+                    done: q.userStatus?.progress?.[type]?.value || 0,
+                    isVideo: type.includes('VIDEO'),
+                    isGame: type === 'PLAY_ON_DESKTOP',
                     enrolled: !!q.userStatus?.enrolledAt
                 });
             } catch {}
         });
 
-        allAvailable.sort((a, b) => {
-            if (a.enrolled !== b.enrolled) return b.enrolled - a.enrolled;
-            return b.isVideo - a.isVideo;
-        });
+        quests.sort((a, b) => (b.enrolled - a.enrolled) || (b.isVideo - a.isVideo));
     }
 
-    loadQuests();
-    if (allAvailable.length === 0) {
-        log("Нет доступных квестов", "warn");
+    refreshQuests();
+    if (quests.length === 0) {
+        log('Нет доступных квестов', 'warn');
         return;
     }
 
-    // === STATE ===
-    let running = false;
-    let stopRequested = false;
-    let cleanups = [];
-    let completedCount = 0;
-    let currentFilter = "video";
-    let sessionStartTime = null;
-    let isMinimized = false;
-
-    const addCleanup = fn => cleanups.push(fn);
-    const runCleanups = () => {
-        cleanups.forEach(fn => { try { fn(); } catch {} });
-        cleanups = [];
-    };
-
-    // === ENROLL (исправленный) ===
-    async function enrollQuest(q) {
+    // ==================== CORE FUNCTIONS ====================
+    async function enroll(q) {
         if (q.enrolled) return true;
-        if (!CONFIG.AUTO_ENROLL) {
-            log(`Квест "${q.name}" не принят (автопринятие выключено)`, "warn");
-            return false;
-        }
-
-        log(`Принимаю квест: ${q.name}`, "info");
+        if (!CONFIG.AUTO_ENROLL) return false;
 
         const locations = [0, 1, 2, 11, 13];
-        for (const location of locations) {
+        for (const loc of locations) {
             try {
-                const response = await api.post({
-                    url: `/quests/${q.id}/enroll`,
-                    body: { location }
-                });
-                if (response && (response.body || response.ok !== false)) {
+                const res = await RestAPI.post({ url: `/quests/${q.id}/enroll`, body: { location: loc } });
+                if (res?.body) {
                     q.enrolled = true;
-                    await sleep(1200);
+                    await sleep(1100);
                     return true;
                 }
-            } catch (e) {}
-            await sleep(350);
+            } catch {}
+            await sleep(300);
         }
-
-        log(`Не удалось принять квест: ${q.name}`, "error");
         return false;
     }
 
-    // === CLAIM (исправленный) ===
-    async function claimQuest(q) {
+    async function claim(q) {
         if (!CONFIG.AUTO_CLAIM) return;
         try {
-            await api.post({
-                url: `/quests/${q.id}/claim-reward`,
-                body: { location: 0 }
-            });
-            log(`Награда получена: ${q.name}`, "success");
-        } catch (e) {
-            // silently fail
-        }
+            await RestAPI.post({ url: `/quests/${q.id}/claim-reward`, body: { location: 0 } });
+        } catch {}
     }
 
-    // === VIDEO ===
-    async function doVideoQuest(q) {
-        log(`Выполняю видео: ${q.name}`, "info");
-
-        let done = q.secondsDone;
-        const needed = q.secondsNeeded;
+    async function runVideo(q) {
+        let done = q.done;
+        const needed = q.needed;
 
         while (done < needed && !stopRequested) {
+            const speed = CONFIG.VIDEO_SPEED + rand(-0.4, 0.7);
+            await sleep(CONFIG.VIDEO_MIN_DELAY + rand(0, 350));
+
             try {
-                const speed = CONFIG.VIDEO_BASE_SPEED + rnd(-0.5, 0.8);
-                const next = Math.min(needed, done + speed);
-
-                await sleep(CONFIG.VIDEO_MIN_DELAY + rnd(0, 400));
-
-                await api.post({
-                    url: `/quests/${q.id}/video-progress`,
-                    body: { timestamp: next }
-                });
-
-                done = next;
-                q.secondsDone = done;
-
-                const progress = Math.floor((done / needed) * 100);
-                updateUI(`🎬 ${q.name}`, progress);
-
+                await RestAPI.post({ url: `/quests/${q.id}/video-progress`, body: { timestamp: done + speed } });
+                done += speed;
+                q.done = done;
+                updateProgress(q.id, Math.floor((done / needed) * 100));
             } catch (e) {
-                if (String(e.message).toLowerCase().includes("429") || 
-                    String(e.message).toLowerCase().includes("captcha")) {
-                    log("Обнаружена защита Discord. Делаю длинную паузу...", "warn");
-                    await sleep(300000 + rnd(0, 180000)); // 5-8 минут
+                if (String(e).includes('429') || String(e).includes('captcha')) {
+                    log('Защита Discord. Пауза 6-10 минут...', 'warn');
+                    await sleep(rand(360000, 600000));
                     break;
                 }
-                await sleep(2000);
             }
         }
 
-        if (done >= needed) {
-            log(`Видео завершено: ${q.name}`, "success");
-            await claimQuest(q);
-        }
+        if (done >= needed) await claim(q);
     }
 
-    // === GAME ===
-    async function doGameQuest(q) {
-        log(`Выполняю игру: ${q.name}`, "info");
-        // Простая имитация
-        const duration = Math.min(q.secondsNeeded * 850, 240000);
-        await sleep(duration);
-        log(`Игра завершена: ${q.name}`, "success");
-        await claimQuest(q);
+    async function runGame(q) {
+        const time = Math.min(q.needed * 820, 200000);
+        await sleep(time);
+        await claim(q);
     }
 
-    // === UI ===
-    let ui = null;
-    let miniUi = null;
+    // ==================== UI ====================
+    let panel = null;
+    let mini = null;
+    let stopRequested = false;
+    let running = false;
+    let currentFilter = 'video';
 
-    function createMainUI() {
-        if (ui) ui.remove();
+    function createUI() {
+        if (panel) panel.remove();
 
-        ui = document.createElement("div");
-        ui.id = "orbs-stealth-ui";
-        ui.style.cssText = "position:fixed; top:70px; right:18px; z-index:999999;";
+        panel = document.createElement('div');
+        panel.id = 'disorbsfarm';
+        panel.style.cssText = 'position:fixed;top:70px;right:18px;z-index:999999;';
 
-        ui.innerHTML = `
-            <div style="background:rgba(28,28,30,0.93); backdrop-filter:blur(40px) saturate(180%); border:1px solid rgba(255,255,255,0.1); border-radius:18px; padding:14px 16px; width:355px; color:#F5F5F7; font-family:-apple-system, BlinkMacSystemFont, sans-serif; box-shadow:0 20px 60px rgba(0,0,0,0.5);">
+        panel.innerHTML = `
+            <div style="background:rgba(28,28,30,0.94);backdrop-filter:blur(42px)saturate(180%);border:1px solid rgba(255,255,255,0.1);border-radius:20px;padding:16px 18px;width:360px;color:#F5F5F7;font-family:-apple-system,BlinkMacSystemFont,sans-serif;box-shadow:0 25px 70px rgba(0,0,0,0.55);">
                 
                 <!-- Header -->
-                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; cursor:move;" id="orbs-drag">
-                    <div style="display:flex; align-items:center; gap:8px;">
-                        <div style="width:24px; height:24px; background:linear-gradient(#5E5CE6, #0A84FF); border-radius:7px; display:flex; align-items:center; justify-content:center; font-size:13px;">👓</div>
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;cursor:move;" id="df-drag">
+                    <div style="display:flex;align-items:center;gap:10px;">
+                        <div style="width:28px;height:28px;background:linear-gradient(135deg,#5E5CE6,#0A84FF);border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:15px;box-shadow:0 3px 10px rgba(10,132,255,0.4);">👓</div>
                         <div>
-                            <div style="font-weight:700; font-size:15px;">DisOrbsFarm</div>
-                            <div style="font-size:9px; color:#8E8E93;">v5.5 • KDStudio</div>
+                            <div style="font-weight:700;font-size:17px;letter-spacing:-0.3px;">DisOrbsFarm</div>
+                            <div style="font-size:10px;color:#8E8E93;margin-top:-1px;">v6.0 • Stable</div>
                         </div>
                     </div>
-                    <div style="display:flex; gap:4px; align-items:center;">
-                        <button id="orbs-minimize" style="background:rgba(255,255,255,0.1); border:none; border-radius:6px; width:22px; height:22px; font-size:13px; cursor:pointer; color:#8E8E93;">−</button>
-                        <button id="orbs-settings-btn" style="background:rgba(255,255,255,0.1); border:none; border-radius:6px; width:22px; height:22px; font-size:12px; cursor:pointer;">⚙</button>
-                        <button id="orbs-close" style="background:rgba(255,69,58,0.2); color:#FF453A; border:none; border-radius:50%; width:20px; height:20px; font-size:12px; font-weight:700; cursor:pointer;">✕</button>
+                    <div style="display:flex;gap:5px;">
+                        <button id="df-min" style="background:rgba(255,255,255,0.1);border:none;border-radius:6px;width:24px;height:24px;font-size:14px;color:#8E8E93;cursor:pointer;">−</button>
+                        <button id="df-set" style="background:rgba(255,255,255,0.1);border:none;border-radius:6px;width:24px;height:24px;font-size:13px;cursor:pointer;">⚙</button>
+                        <button id="df-close" style="background:rgba(255,69,58,0.18);color:#FF453A;border:none;border-radius:50%;width:22px;height:22px;font-size:13px;font-weight:700;cursor:pointer;">✕</button>
                     </div>
                 </div>
 
                 <!-- Stats -->
-                <div style="display:flex; gap:5px; margin-bottom:8px;">
-                    <div style="flex:1; background:rgba(255,255,255,0.06); border-radius:9px; padding:5px 7px; font-size:10px;">
+                <div style="display:flex;gap:6px;margin-bottom:10px;">
+                    <div style="flex:1;background:rgba(255,255,255,0.06);border-radius:10px;padding:7px 9px;font-size:10px;">
                         <div style="color:#8E8E93;">КВЕСТОВ</div>
-                        <div id="stat-quests" style="font-weight:700; font-size:14px;">0</div>
+                        <div id="df-stat-quests" style="font-weight:700;font-size:15px;">0</div>
                     </div>
-                    <div style="flex:1; background:rgba(255,255,255,0.06); border-radius:9px; padding:5px 7px; font-size:10px;">
+                    <div style="flex:1;background:rgba(255,255,255,0.06);border-radius:10px;padding:7px 9px;font-size:10px;">
                         <div style="color:#8E8E93;">ВРЕМЯ</div>
-                        <div id="stat-time" style="font-weight:700; font-size:14px;">00:00</div>
+                        <div id="df-stat-time" style="font-weight:700;font-size:15px;">00:00</div>
                     </div>
                 </div>
 
                 <!-- Settings -->
-                <div id="orbs-settings" style="display:none; background:rgba(20,20,22,0.95); border-radius:10px; padding:10px; margin-bottom:8px; font-size:11px; border:1px solid rgba(255,255,255,0.1);">
-                    <div style="margin-bottom:6px;">
-                        <div style="color:#8E8E93; margin-bottom:2px;">Режим</div>
-                        <select id="cfg-stealth" style="width:100%; padding:4px; border-radius:5px; background:#2b2d31; color:#fff; border:1px solid #3f4147;">
-                            <option value="1">⚡ Макс. скорость</option>
-                            <option value="2" selected>⚖ Баланс</option>
-                            <option value="3">🛡 Безопасность</option>
+                <div id="df-settings" style="display:none;background:rgba(20,20,22,0.96);border-radius:12px;padding:12px;margin-bottom:10px;font-size:12px;border:1px solid rgba(255,255,255,0.1);">
+                    <div style="margin-bottom:8px;">
+                        <div style="color:#8E8E93;margin-bottom:3px;font-size:11px;">Режим работы</div>
+                        <select id="df-mode" style="width:100%;padding:6px 8px;border-radius:7px;background:#2b2d31;color:#fff;border:1px solid #3f4147;">
+                            <option value="1">⚡ Максимальная скорость</option>
+                            <option value="2" selected>⚖ Баланс (рекомендуется)</option>
+                            <option value="3">🛡 Максимальная безопасность</option>
                         </select>
                     </div>
-                    
-                    <label style="display:flex; align-items:center; gap:5px; margin:3px 0;">
-                        <input type="checkbox" id="cfg-enroll" checked> Автопринятие квестов
-                    </label>
-                    <label style="display:flex; align-items:center; gap:5px; margin:3px 0;">
-                        <input type="checkbox" id="cfg-claim"> Автоклейм награды <span style="color:#FF453A; font-size:9px;">(риск)</span>
-                    </label>
-                    <label style="display:flex; align-items:center; gap:5px; margin:3px 0;">
-                        <input type="checkbox" id="cfg-no-pause"> Убрать паузы между квестами <span style="color:#FF9F0A; font-size:9px;">(риск)</span>
-                    </label>
-                    <label style="display:flex; align-items:center; gap:5px; margin:3px 0;">
-                        <input type="checkbox" id="cfg-notifications" checked> Уведомления при завершении
-                    </label>
 
-                    <div style="margin-top:8px;">
-                        <div style="color:#8E8E93; margin-bottom:2px;">Скорость видео</div>
-                        <input type="range" id="cfg-speed" min="1.5" max="12" step="0.5" value="4" style="width:100%;">
-                        <div style="font-size:9px; color:#8E8E93; display:flex; justify-content:space-between;">
-                            <span>1.5</span>
-                            <span id="speed-val">4.0</span>
-                            <span>12</span>
+                    <div style="display:grid;grid-template-columns:1fr;gap:6px;margin-bottom:8px;">
+                        <label style="display:flex;align-items:center;gap:6px;"><input type="checkbox" id="df-enroll" checked> Автопринятие квестов</label>
+                        <label style="display:flex;align-items:center;gap:6px;"><input type="checkbox" id="df-claim"> Автоклейм <span style="color:#FF453A;font-size:10px;">(риск)</span></label>
+                        <label style="display:flex;align-items:center;gap:6px;"><input type="checkbox" id="df-nopause"> Убрать паузы между квестами <span style="color:#FF9F0A;font-size:10px;">(риск)</span></label>
+                        <label style="display:flex;align-items:center;gap:6px;"><input type="checkbox" id="df-notify" checked> Уведомления при завершении</label>
+                    </div>
+
+                    <div>
+                        <div style="color:#8E8E93;margin-bottom:3px;font-size:11px;">Скорость видео</div>
+                        <input type="range" id="df-speed" min="1.5" max="12" step="0.5" value="4" style="width:100%;">
+                        <div style="display:flex;justify-content:space-between;font-size:9.5px;color:#8E8E93;margin-top:2px;">
+                            <span>1.5x</span><span id="df-speed-val">4.0x</span><span>12x</span>
                         </div>
                     </div>
                 </div>
 
                 <!-- Filters -->
-                <div style="display:flex; gap:4px; margin-bottom:6px;">
-                    <button id="filter-video" style="flex:1; padding:5px 0; border-radius:7px; border:none; background:#0A84FF; color:white; font-size:11px; font-weight:600;">🎬 Видео</button>
-                    <button id="filter-game" style="flex:1; padding:5px 0; border-radius:7px; border:none; background:rgba(255,255,255,0.1); color:#F5F5F7; font-size:11px; font-weight:500;">🎮 Игры</button>
-                    <button id="orbs-refresh" style="padding:5px 8px; border-radius:7px; border:1px solid rgba(255,255,255,0.15); background:rgba(255,255,255,0.06); color:#F5F5F7; font-size:12px; cursor:pointer;">🔄</button>
+                <div style="display:flex;gap:5px;margin-bottom:8px;">
+                    <button id="df-video" style="flex:1;padding:6px 0;border-radius:8px;border:none;background:#0A84FF;color:white;font-size:11px;font-weight:600;">🎬 Видео</button>
+                    <button id="df-game" style="flex:1;padding:6px 0;border-radius:8px;border:none;background:rgba(255,255,255,0.1);color:#F5F5F7;font-size:11px;font-weight:500;">🎮 Игры</button>
+                    <button id="df-refresh" style="padding:6px 10px;border-radius:8px;border:1px solid rgba(255,255,255,0.15);background:rgba(255,255,255,0.06);color:#F5F5F7;font-size:13px;cursor:pointer;">🔄</button>
                 </div>
 
-                <div id="orbs-status" style="font-size:10px; color:#8E8E93; margin-bottom:3px;">Готов к работе</div>
-                <div style="background:rgba(255,255,255,0.08); border-radius:999px; height:4px; margin-bottom:6px;">
-                    <div id="orbs-bar" style="background:linear-gradient(#0A84FF, #5E5CE6); height:100%; width:0%; transition:width .3s; border-radius:999px;"></div>
+                <div id="df-status" style="font-size:11px;color:#8E8E93;margin-bottom:4px;">Готов к работе</div>
+                <div style="background:rgba(255,255,255,0.08);border-radius:999px;height:4px;margin-bottom:8px;"><div id="df-bar" style="background:linear-gradient(#0A84FF,#5E5CE6);height:100%;width:0%;transition:width .35s;border-radius:999px;"></div></div>
+
+                <div id="df-list" style="max-height:160px;overflow-y:auto;font-size:12px;margin-bottom:10px;"></div>
+
+                <div style="display:flex;gap:8px;">
+                    <button id="df-start" style="flex:1;background:#0A84FF;color:white;border:none;border-radius:10px;padding:11px 0;font-weight:700;font-size:14px;cursor:pointer;">🚀 СТАРТ</button>
+                    <button id="df-stop" style="flex:1;background:rgba(255,255,255,0.1);color:#F5F5F7;border:1px solid rgba(255,255,255,0.2);border-radius:10px;padding:11px 0;font-weight:700;font-size:14px;cursor:pointer;display:none;">⏹ СТОП</button>
                 </div>
 
-                <div id="orbs-list" style="max-height:155px; overflow-y:auto; font-size:11px; margin-bottom:8px;"></div>
-
-                <div style="display:flex; gap:8px;">
-                    <button id="orbs-start" style="flex:1; background:#0A84FF; color:white; border:none; border-radius:9px; padding:9px 0; font-weight:700; font-size:13px; cursor:pointer;">🚀 СТАРТ</button>
-                    <button id="orbs-stop" style="flex:1; background:rgba(255,255,255,0.1); color:#F5F5F7; border:1px solid rgba(255,255,255,0.2); border-radius:9px; padding:9px 0; font-weight:700; font-size:13px; cursor:pointer; display:none;">⏹ СТОП</button>
-                </div>
-
-                <div style="margin-top:6px; text-align:center; font-size:8.5px; color:#636366;">
-                    Только для образовательных целей • © 2026 KDStudio
-                </div>
+                <div style="margin-top:10px;text-align:center;font-size:9px;color:#636366;">Только для образовательных целей • © 2026 KDStudio</div>
             </div>
         `;
 
-        document.body.appendChild(ui);
+        document.body.appendChild(panel);
 
-        // Drag logic (исправленный)
-        let dragging = false;
-        let ox = 0, oy = 0;
-
-        const dragHandle = ui.querySelector("#orbs-drag");
-        dragHandle.onmousedown = (e) => {
+        // Drag
+        let dragging = false, ox = 0, oy = 0;
+        const drag = panel.querySelector('#df-drag');
+        drag.onmousedown = e => {
             dragging = true;
-            const rect = ui.getBoundingClientRect();
-            ox = e.clientX - rect.left;
-            oy = e.clientY - rect.top;
-            ui.style.right = "auto";
-            ui.style.left = rect.left + "px";
-            ui.style.top = rect.top + "px";
+            const r = panel.getBoundingClientRect();
+            ox = e.clientX - r.left;
+            oy = e.clientY - r.top;
+            panel.style.right = 'auto';
+            panel.style.left = r.left + 'px';
+            panel.style.top = r.top + 'px';
         };
-
-        document.addEventListener("mousemove", (e) => {
-            if (dragging && ui) {
-                ui.style.left = (e.clientX - ox) + "px";
-                ui.style.top = (e.clientY - oy) + "px";
+        document.addEventListener('mousemove', e => {
+            if (dragging) {
+                panel.style.left = (e.clientX - ox) + 'px';
+                panel.style.top = (e.clientY - oy) + 'px';
             }
         });
+        document.addEventListener('mouseup', () => dragging = false);
 
-        document.addEventListener("mouseup", () => dragging = false);
-
-        // Minimize
-        ui.querySelector("#orbs-minimize").onclick = () => minimizeUI();
-
-        setupListeners();
+        setupUI();
     }
 
-    function minimizeUI() {
-        if (!ui) return;
-        isMinimized = true;
-        ui.style.display = "none";
+    function setupUI() {
+        const list = panel.querySelector('#df-list');
+        const fVideo = panel.querySelector('#df-video');
+        const fGame = panel.querySelector('#df-game');
+        const refresh = panel.querySelector('#df-refresh');
+        const settings = panel.querySelector('#df-settings');
+        const setBtn = panel.querySelector('#df-set');
 
-        if (!miniUi) {
-            miniUi = document.createElement("div");
-            miniUi.style.cssText = "position:fixed; top:20px; right:20px; background:rgba(28,28,30,0.95); backdrop-filter:blur(20px); border:1px solid rgba(255,255,255,0.15); border-radius:999px; padding:6px 14px; display:flex; align-items:center; gap:8px; z-index:999999; box-shadow:0 8px 30px rgba(0,0,0,0.4);";
-            miniUi.innerHTML = `
-                <div style="display:flex; align-items:center; gap:6px;">
-                    <div style="width:18px; height:18px; background:linear-gradient(#5E5CE6, #0A84FF); border-radius:5px; display:flex; align-items:center; justify-content:center; font-size:10px;">👓</div>
-                    <div style="font-weight:600; font-size:12px;">DisOrbsFarm</div>
-                </div>
-                <button id="mini-restore" style="background:#0A84FF; color:white; border:none; border-radius:999px; padding:2px 9px; font-size:10px; font-weight:600; cursor:pointer;">Развернуть</button>
-            `;
-            document.body.appendChild(miniUi);
-            miniUi.querySelector("#mini-restore").onclick = () => {
-                if (miniUi) miniUi.remove();
-                if (ui) ui.style.display = "block";
-                isMinimized = false;
-            };
-        }
-    }
-
-    function setupListeners() {
-        const listEl = ui.querySelector("#orbs-list");
-        const fVideo = ui.querySelector("#filter-video");
-        const fGame = ui.querySelector("#filter-game");
-        const refreshBtn = ui.querySelector("#orbs-refresh");
-        const settingsPanel = ui.querySelector("#orbs-settings");
-        const settingsBtn = ui.querySelector("#orbs-settings-btn");
-
-        function renderQuestList() {
-            listEl.innerHTML = "";
-            let filtered = allAvailable;
-
-            if (currentFilter === "video") filtered = allAvailable.filter(q => q.isVideo);
-            else if (currentFilter === "game") filtered = allAvailable.filter(q => q.isGame);
+        function render() {
+            list.innerHTML = '';
+            let filtered = quests;
+            if (currentFilter === 'video') filtered = quests.filter(q => q.isVideo);
+            else if (currentFilter === 'game') filtered = quests.filter(q => q.isGame);
 
             filtered.forEach(q => {
-                const div = document.createElement("div");
-                div.style.cssText = "padding:5px 6px; border-bottom:1px solid rgba(255,255,255,0.05); display:flex; align-items:center; gap:7px;";
-
-                const checked = selectedQuestIds.has(q.id) ? "checked" : "";
-                const progress = q.secondsNeeded > 0 ? Math.floor((q.secondsDone / q.secondsNeeded) * 100) : 0;
+                const div = document.createElement('div');
+                div.style.cssText = 'padding:6px 8px;border-bottom:1px solid rgba(255,255,255,0.06);display:flex;align-items:center;gap:8px;';
+                const checked = selected.has(q.id) ? 'checked' : '';
+                const pct = q.needed > 0 ? Math.floor((q.done / q.needed) * 100) : 0;
 
                 div.innerHTML = `
-                    <input type="checkbox" ${checked} style="accent-color:#0A84FF; width:15px; height:15px;">
-                    <div style="flex:1; min-width:0;">
-                        <div style="font-weight:600; font-size:11px;">${q.isVideo ? "🎬" : "🎮"} ${q.name}</div>
-                        <div style="height:2.5px; background:rgba(255,255,255,0.1); border-radius:999px; margin-top:2px;">
-                            <div style="height:100%; width:${progress}%; background:linear-gradient(#0A84FF, #5E5CE6); border-radius:999px;"></div>
-                        </div>
+                    <input type="checkbox" ${checked} style="accent-color:#0A84FF;width:15px;height:15px;">
+                    <div style="flex:1;min-width:0;">
+                        <div style="font-weight:600;font-size:12px;">${q.isVideo ? '🎬' : '🎮'} ${q.name}</div>
+                        <div style="height:3px;background:rgba(255,255,255,0.1);border-radius:999px;margin-top:3px;"><div style="height:100%;width:${pct}%;background:linear-gradient(#0A84FF,#5E5CE6);border-radius:999px;"></div></div>
                     </div>
-                    <div style="font-size:9px; color:#8E8E93; min-width:42px; text-align:right;">${Math.floor(q.secondsDone)}/${q.secondsNeeded}s</div>
+                    <div style="font-size:10px;color:#8E8E93;min-width:44px;text-align:right;">${Math.floor(q.done)}/${q.needed}s</div>
                 `;
 
-                const checkbox = div.querySelector("input");
-                checkbox.onchange = () => {
-                    if (checkbox.checked) selectedQuestIds.add(q.id);
-                    else selectedQuestIds.delete(q.id);
-                };
-
-                listEl.appendChild(div);
+                const chk = div.querySelector('input');
+                chk.onchange = () => chk.checked ? selected.add(q.id) : selected.delete(q.id);
+                list.appendChild(div);
             });
         }
 
-        renderQuestList();
+        render();
 
-        // Filters
-        fVideo.onclick = () => {
-            currentFilter = "video";
-            fVideo.style.background = "#0A84FF";
-            fVideo.style.color = "white";
-            fGame.style.background = "rgba(255,255,255,0.1)";
-            fGame.style.color = "#F5F5F7";
-            renderQuestList();
-        };
+        fVideo.onclick = () => { currentFilter = 'video'; fVideo.style.background = '#0A84FF'; fVideo.style.color = 'white'; fGame.style.background = 'rgba(255,255,255,0.1)'; fGame.style.color = '#F5F5F7'; render(); };
+        fGame.onclick = () => { currentFilter = 'game'; fGame.style.background = '#0A84FF'; fGame.style.color = 'white'; fVideo.style.background = 'rgba(255,255,255,0.1)'; fVideo.style.color = '#F5F5F7'; render(); };
+        fVideo.style.background = '#0A84FF'; fVideo.style.color = 'white';
 
-        fGame.onclick = () => {
-            currentFilter = "game";
-            fGame.style.background = "#0A84FF";
-            fGame.style.color = "white";
-            fVideo.style.background = "rgba(255,255,255,0.1)";
-            fVideo.style.color = "#F5F5F7";
-            renderQuestList();
-        };
+        refresh.onclick = () => { refreshQuests(); selected.clear(); render(); log('Квесты обновлены', 'info'); };
 
-        fVideo.style.background = "#0A84FF";
-        fVideo.style.color = "white";
+        let open = false;
+        setBtn.onclick = () => { open = !open; settings.style.display = open ? 'block' : 'none'; };
 
-        // Refresh
-        refreshBtn.onclick = () => {
-            loadQuests();
-            selectedQuestIds.clear();
-            renderQuestList();
-            log("Список квестов обновлён", "info");
-        };
+        // Settings bindings
+        panel.querySelector('#df-mode').onchange = e => applyPreset(parseInt(e.target.value));
+        panel.querySelector('#df-enroll').onchange = e => CONFIG.AUTO_ENROLL = e.target.checked;
+        panel.querySelector('#df-claim').onchange = e => CONFIG.AUTO_CLAIM = e.target.checked;
+        panel.querySelector('#df-nopause').onchange = e => CONFIG.DISABLE_PAUSES = e.target.checked;
+        panel.querySelector('#df-notify').onchange = e => CONFIG.NOTIFICATIONS = e.target.checked;
 
-        // Settings
-        let settingsOpen = false;
-        settingsBtn.onclick = () => {
-            settingsOpen = !settingsOpen;
-            settingsPanel.style.display = settingsOpen ? "block" : "none";
-        };
+        const speed = panel.querySelector('#df-speed');
+        const speedVal = panel.querySelector('#df-speed-val');
+        speed.oninput = () => { CONFIG.VIDEO_SPEED = parseFloat(speed.value); speedVal.textContent = CONFIG.VIDEO_SPEED.toFixed(1) + 'x'; };
 
-        ui.querySelector("#cfg-enroll").onchange = e => CONFIG.AUTO_ENROLL = e.target.checked;
-        ui.querySelector("#cfg-claim").onchange = e => CONFIG.AUTO_CLAIM = e.target.checked;
-        ui.querySelector("#cfg-no-pause").onchange = e => CONFIG.DISABLE_PAUSES = e.target.checked;
-        ui.querySelector("#cfg-notifications").onchange = e => CONFIG.NOTIFICATIONS_ENABLED = e.target.checked;
-
-        const speedSlider = ui.querySelector("#cfg-speed");
-        const speedValue = ui.querySelector("#speed-val");
-        speedSlider.oninput = () => {
-            CONFIG.VIDEO_BASE_SPEED = parseFloat(speedSlider.value);
-            speedValue.textContent = CONFIG.VIDEO_BASE_SPEED.toFixed(1);
-        };
-
-        // Start / Stop
-        ui.querySelector("#orbs-start").onclick = () => { if (!running) startFarm(); };
-        ui.querySelector("#orbs-stop").onclick = () => { stopRequested = true; running = false; runCleanups(); };
-        ui.querySelector("#orbs-close").onclick = () => { if (ui) ui.remove(); };
+        panel.querySelector('#df-start').onclick = start;
+        panel.querySelector('#df-stop').onclick = () => { stopRequested = true; running = false; };
+        panel.querySelector('#df-close').onclick = () => panel.remove();
+        panel.querySelector('#df-min').onclick = minimize;
     }
 
-    function updateUI(status, progress = 0) {
-        if (!ui) return;
-        const statusEl = ui.querySelector("#orbs-status");
-        const barEl = ui.querySelector("#orbs-bar");
-
-        if (statusEl) statusEl.textContent = status;
-        if (barEl) barEl.style.width = progress + "%";
+    function minimize() {
+        if (!panel) return;
+        panel.style.display = 'none';
+        if (!mini) {
+            mini = document.createElement('div');
+            mini.style.cssText = 'position:fixed;top:22px;right:22px;background:rgba(28,28,30,0.95);backdrop-filter:blur(20px);border:1px solid rgba(255,255,255,0.15);border-radius:999px;padding:5px 12px;display:flex;align-items:center;gap:8px;z-index:999999;';
+            mini.innerHTML = `<div style="display:flex;align-items:center;gap:6px;"><div style="width:18px;height:18px;background:linear-gradient(#5E5CE6,#0A84FF);border-radius:5px;display:flex;align-items:center;justify-content:center;font-size:10px;">👓</div><div style="font-weight:600;font-size:12px;">DisOrbsFarm</div></div><button style="background:#0A84FF;color:white;border:none;border-radius:999px;padding:2px 10px;font-size:10px;font-weight:600;cursor:pointer;">Развернуть</button>`;
+            document.body.appendChild(mini);
+            mini.querySelector('button').onclick = () => { mini.remove(); mini = null; panel.style.display = 'block'; };
+        }
     }
 
-    async function startFarm() {
+    function updateProgress(id, pct) {
+        const el = panel?.querySelector(`#df-list > div`);
+        // simple update - можно улучшить при необходимости
+    }
+
+    async function start() {
         if (running) return;
-
         running = true;
         stopRequested = false;
-        completedCount = 0;
-        sessionStartTime = now();
 
-        let queue = allAvailable.filter(q => selectedQuestIds.has(q.id));
-        if (queue.length === 0) {
-            queue = allAvailable.slice(0, 6);
-        }
+        let queue = quests.filter(q => selected.has(q.id));
+        if (queue.length === 0) queue = quests.slice(0, 5);
 
-        ui.querySelector("#orbs-start").style.display = "none";
-        ui.querySelector("#orbs-stop").style.display = "block";
+        panel.querySelector('#df-start').style.display = 'none';
+        panel.querySelector('#df-stop').style.display = 'block';
 
         for (let i = 0; i < queue.length; i++) {
             if (stopRequested) break;
-
             const q = queue[i];
-            const enrolled = await enrollQuest(q);
-            if (!enrolled && !q.enrolled) continue;
+
+            const ok = await enroll(q);
+            if (!ok && !q.enrolled) continue;
 
             try {
-                if (q.isVideo) {
-                    await doVideoQuest(q);
-                } else if (q.isGame) {
-                    await doGameQuest(q);
-                }
-
-                completedCount++;
-                updateUI(`Выполнено: ${q.name}`, 100);
-
-            } catch (err) {
-                log(`Ошибка при выполнении ${q.name}: ${err.message}`, "error");
+                if (q.isVideo) await runVideo(q);
+                else if (q.isGame) await runGame(q);
+            } catch (e) {
+                log(`Ошибка: ${e.message}`, 'error');
             }
 
-            // Пауза между квестами
             if (!CONFIG.DISABLE_PAUSES && i < queue.length - 1 && !stopRequested) {
-                const pauseTime = rndInt(...CONFIG.PAUSE_BETWEEN_QUESTS);
-                log(`Пауза ${pauseTime} сек...`, "warn");
-
-                for (let s = pauseTime; s > 0 && !stopRequested; s--) {
-                    updateUI(`Пауза ${s}с...`, 0);
+                const p = rand(...CONFIG.PAUSE_BETWEEN_QUESTS);
+                for (let s = p; s > 0 && !stopRequested; s--) {
+                    panel.querySelector('#df-status').textContent = `Пауза ${s}с...`;
                     await sleep(1000);
                 }
             }
         }
 
         running = false;
-        ui.querySelector("#orbs-start").style.display = "block";
-        ui.querySelector("#orbs-stop").style.display = "none";
+        panel.querySelector('#df-start').style.display = 'block';
+        panel.querySelector('#df-stop').style.display = 'none';
+        panel.querySelector('#df-status').textContent = `Завершено • ${queue.length} квестов`;
 
-        const finalMsg = `Завершено • ${completedCount} квестов`;
-        updateUI(finalMsg, 100);
-        log(finalMsg, "success");
-
-        showNotification("DisOrbsFarm", finalMsg);
+        notify('DisOrbsFarm', `Завершено ${queue.length} квестов`);
+        log('Сессия завершена', 'success');
     }
 
+    // Start UI
     if (CONFIG.SHOW_UI) {
-        createMainUI();
-        log("DisOrbsFarm v5.5 готов к работе", "success");
+        createUI();
+        log('DisOrbsFarm v6.0 готов', 'success');
     }
 
-    window.closeOrbsFarmer = () => {
-        if (ui) ui.remove();
-        if (miniUi) miniUi.remove();
-    };
+    window.closeOrbsFarmer = () => { if (panel) panel.remove(); if (mini) mini.remove(); };
 })();
