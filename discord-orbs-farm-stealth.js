@@ -1,120 +1,106 @@
 /*
- * 🔥 DisOrbsFarm v6.0
- * Полная переработка с нуля
- * Самая стабильная и аккуратная версия
+ * DisOrbsFarm v7.0
+ * Полная перезапись с нуля
+ * Максимально чистая, стабильная и функциональная версия
  */
 
 (async () => {
     "use strict";
 
-    // ==================== CONFIG ====================
+    // ================== CONFIG ==================
     const CONFIG = {
-        STEALTH_LEVEL: 2,
-        AUTO_ENROLL: true,
-        AUTO_CLAIM: false,
-        VIDEO_SPEED: 4.0,
-        PAUSE_BETWEEN_QUESTS: [45, 120],
-        DISABLE_PAUSES: false,
-        NOTIFICATIONS: true
+        level: 2,
+        autoEnroll: true,
+        autoClaim: false,
+        videoSpeed: 4.0,
+        pauseRange: [45, 120],
+        disablePauses: false,
+        notifications: true
     };
 
-    function applyPreset(level) {
-        CONFIG.STEALTH_LEVEL = level;
-        if (level === 1) {
-            CONFIG.VIDEO_SPEED = 8.5;
-            CONFIG.PAUSE_BETWEEN_QUESTS = [8, 18];
-        } else if (level === 2) {
-            CONFIG.VIDEO_SPEED = 4.0;
-            CONFIG.PAUSE_BETWEEN_QUESTS = [45, 120];
+    function setLevel(lvl) {
+        CONFIG.level = lvl;
+        if (lvl === 1) {
+            CONFIG.videoSpeed = 8.0;
+            CONFIG.pauseRange = [6, 15];
+        } else if (lvl === 2) {
+            CONFIG.videoSpeed = 4.0;
+            CONFIG.pauseRange = [45, 120];
         } else {
-            CONFIG.VIDEO_SPEED = 2.3;
-            CONFIG.PAUSE_BETWEEN_QUESTS = [90, 240];
+            CONFIG.videoSpeed = 2.4;
+            CONFIG.pauseRange = [90, 240];
         }
     }
-    applyPreset(CONFIG.STEALTH_LEVEL);
+    setLevel(CONFIG.level);
 
-    // ==================== UTILS ====================
+    // ================== HELPERS ==================
     const sleep = ms => new Promise(r => setTimeout(r, ms));
     const rand = (min, max) => Math.random() * (max - min) + min;
-    const now = () => Date.now();
 
-    function playSound(freq = 880, duration = 180) {
+    function sound(freq = 850, time = 160) {
         try {
-            const ctx = new (window.AudioContext || window.webkitAudioContext)();
-            const osc = ctx.createOscillator();
-            const gain = ctx.createGain();
-            osc.type = 'sine';
-            osc.frequency.value = freq;
-            gain.gain.value = 0.3;
-            osc.connect(gain);
-            gain.connect(ctx.destination);
-            osc.start();
+            const ctx = new (AudioContext || webkitAudioContext)();
+            const o = ctx.createOscillator();
+            const g = ctx.createGain();
+            o.type = "sine";
+            o.frequency.value = freq;
+            g.gain.value = 0.3;
+            o.connect(g); g.connect(ctx.destination);
+            o.start();
             setTimeout(() => {
-                gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.1);
-                setTimeout(() => osc.stop(), 60);
-            }, duration);
+                g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.08);
+                setTimeout(() => o.stop(), 40);
+            }, time);
         } catch {}
     }
 
-    function notify(title, body) {
-        if (!CONFIG.NOTIFICATIONS) return;
+    function notify(title, msg) {
+        if (!CONFIG.notifications) return;
         try {
-            if (Notification.permission === 'granted') {
-                new Notification(title, { body });
-            } else if (Notification.permission !== 'denied') {
-                Notification.requestPermission().then(p => p === 'granted' && new Notification(title, { body }));
-            }
+            if (Notification.permission === "granted") new Notification(title, { body: msg });
+            else if (Notification.permission !== "denied") Notification.requestPermission().then(p => p === "granted" && new Notification(title, { body: msg }));
         } catch {}
-        playSound(720, 280);
+        sound(720, 220);
     }
 
-    const log = (msg, type = 'info') => {
-        const color = { info: '#0A84FF', success: '#30D158', warn: '#FF9F0A', error: '#FF453A' }[type] || '#0A84FF';
-        console.log(`%c[DisOrbsFarm] ${msg}`, `color:${color}; font-weight:600`);
+    const print = (text, type = "info") => {
+        const color = { info: "#0A84FF", success: "#30D158", warn: "#FF9F0A", error: "#FF453A" }[type] || "#0A84FF";
+        console.log(`%c[DisOrbsFarm] ${text}`, `color:${color};font-weight:600`);
     };
 
-    // ==================== DISCORD MODULES ====================
+    // ================== MODULES ==================
     delete window.$;
-    let wpRequire;
+    let wp;
     try {
-        wpRequire = webpackChunkdiscord_app.push([[Symbol()], {}, r => r]);
+        wp = webpackChunkdiscord_app.push([[Symbol()], {}, r => r]);
         webpackChunkdiscord_app.pop();
-    } catch {
-        log('Не удалось загрузить модули Discord', 'error');
-        return;
-    }
+    } catch { return; }
 
-    const getModule = (check) => {
-        for (const mod of Object.values(wpRequire.c)) {
-            const exp = mod?.exports;
-            if (!exp) continue;
-            for (const val of [exp.A, exp.Ay, exp.Z, exp.default, exp]) {
-                try { if (val && check(val)) return val; } catch {}
-            }
+    const getMod = fn => {
+        for (const m of Object.values(wp.c)) {
+            const e = m?.exports;
+            if (!e) continue;
+            for (const v of [e.A, e.Ay, e.Z, e.default, e.Bo, e.h, e]) if (v && fn(v)) return v;
         }
         return null;
     };
 
-    let QuestsStore = getModule(m => m.getQuest && m.quests) || 
-                      Object.values(wpRequire.c).find(x => x?.exports?.A?.__proto__?.getQuest)?.exports?.A;
-    let RestAPI = getModule(m => m.get && m.post) || 
-                  Object.values(wpRequire.c).find(x => x?.exports?.Bo?.get)?.exports?.Bo;
+    const Quests = getMod(m => m.getQuest && m.quests) || Object.values(wp.c).find(x => x?.exports?.A?.__proto__?.getQuest)?.exports?.A;
+    const API = getMod(m => m.post && m.get) || Object.values(wp.c).find(x => x?.exports?.Bo?.get)?.exports?.Bo;
 
-    if (!QuestsStore || !RestAPI) {
-        log('Не найдены необходимые модули', 'error');
-        return;
-    }
+    if (!Quests || !API) { print("Не удалось загрузить модули Discord", "error"); return; }
 
-    // ==================== QUESTS ====================
-    let quests = [];
-    let selected = new Set();
+    // ================== STATE ==================
+    let list = [];
+    let chosen = new Set();
+    let running = false;
+    let stopped = false;
+    let currentFilter = "video";
 
-    function refreshQuests() {
-        quests = [];
+    function loadQuests() {
+        list = [];
         let raw = [];
-        try {
-            raw = QuestsStore.quests instanceof Map ? [...QuestsStore.quests.values()] : Object.values(QuestsStore.quests || {});
-        } catch {}
+        try { raw = Quests.quests instanceof Map ? [...Quests.quests.values()] : Object.values(Quests.quests || {}); } catch {}
 
         raw.forEach(q => {
             try {
@@ -122,334 +108,311 @@
                 const cfg = q.config?.taskConfig ?? q.config?.taskConfigV2;
                 if (!cfg?.tasks) return;
 
-                const type = Object.keys(cfg.tasks).find(t => t.includes('VIDEO') || t === 'PLAY_ON_DESKTOP');
+                const type = Object.keys(cfg.tasks).find(t => t.includes("VIDEO") || t === "PLAY_ON_DESKTOP");
                 if (!type) return;
 
-                quests.push({
+                list.push({
                     id: q.id,
-                    name: q.config?.messages?.questName || q.config?.application?.name || 'Quest',
+                    name: q.config?.messages?.questName || q.config?.application?.name || "Quest",
                     needed: cfg.tasks[type].target || 0,
                     done: q.userStatus?.progress?.[type]?.value || 0,
-                    isVideo: type.includes('VIDEO'),
-                    isGame: type === 'PLAY_ON_DESKTOP',
+                    video: type.includes("VIDEO"),
+                    game: type === "PLAY_ON_DESKTOP",
                     enrolled: !!q.userStatus?.enrolledAt
                 });
             } catch {}
         });
 
-        quests.sort((a, b) => (b.enrolled - a.enrolled) || (b.isVideo - a.isVideo));
+        list.sort((a, b) => (b.enrolled - a.enrolled) || (b.video - a.video));
     }
 
-    refreshQuests();
-    if (quests.length === 0) {
-        log('Нет доступных квестов', 'warn');
-        return;
-    }
+    loadQuests();
+    if (!list.length) { print("Нет доступных квестов", "warn"); return; }
 
-    // ==================== CORE FUNCTIONS ====================
-    async function enroll(q) {
+    // ================== ACTIONS ==================
+    async function enrollQuest(q) {
         if (q.enrolled) return true;
-        if (!CONFIG.AUTO_ENROLL) return false;
+        if (!CONFIG.autoEnroll) return false;
 
-        const locations = [0, 1, 2, 11, 13];
-        for (const loc of locations) {
+        for (const loc of [0, 1, 2, 11, 13]) {
             try {
-                const res = await RestAPI.post({ url: `/quests/${q.id}/enroll`, body: { location: loc } });
-                if (res?.body) {
+                const r = await API.post({ url: `/quests/${q.id}/enroll`, body: { location: loc } });
+                if (r?.body) {
                     q.enrolled = true;
-                    await sleep(1100);
+                    await sleep(1000);
                     return true;
                 }
             } catch {}
-            await sleep(300);
+            await sleep(280);
         }
         return false;
     }
 
-    async function claim(q) {
-        if (!CONFIG.AUTO_CLAIM) return;
-        try {
-            await RestAPI.post({ url: `/quests/${q.id}/claim-reward`, body: { location: 0 } });
-        } catch {}
+    async function claimQuest(q) {
+        if (!CONFIG.autoClaim) return;
+        try { await API.post({ url: `/quests/${q.id}/claim-reward`, body: { location: 0 } }); } catch {}
     }
 
-    async function runVideo(q) {
+    async function doVideo(q) {
         let done = q.done;
-        const needed = q.needed;
+        const total = q.needed;
 
-        while (done < needed && !stopRequested) {
-            const speed = CONFIG.VIDEO_SPEED + rand(-0.4, 0.7);
-            await sleep(CONFIG.VIDEO_MIN_DELAY + rand(0, 350));
+        while (done < total && !stopped) {
+            const step = CONFIG.videoSpeed + rand(-0.35, 0.65);
+            await sleep(1350 + rand(0, 380));
 
             try {
-                await RestAPI.post({ url: `/quests/${q.id}/video-progress`, body: { timestamp: done + speed } });
-                done += speed;
+                await API.post({ url: `/quests/${q.id}/video-progress`, body: { timestamp: done + step } });
+                done += step;
                 q.done = done;
-                updateProgress(q.id, Math.floor((done / needed) * 100));
+                updateBar(q.id, Math.floor((done / total) * 100));
             } catch (e) {
-                if (String(e).includes('429') || String(e).includes('captcha')) {
-                    log('Защита Discord. Пауза 6-10 минут...', 'warn');
-                    await sleep(rand(360000, 600000));
+                if (String(e).includes("429") || String(e).includes("captcha")) {
+                    print("Защита Discord. Долгая пауза...", "warn");
+                    await sleep(rand(350000, 550000));
                     break;
                 }
             }
         }
-
-        if (done >= needed) await claim(q);
+        if (done >= total) await claimQuest(q);
     }
 
-    async function runGame(q) {
-        const time = Math.min(q.needed * 820, 200000);
-        await sleep(time);
-        await claim(q);
+    async function doGame(q) {
+        await sleep(Math.min(q.needed * 800, 180000));
+        await claimQuest(q);
     }
 
-    // ==================== UI ====================
-    let panel = null;
-    let mini = null;
-    let stopRequested = false;
-    let running = false;
-    let currentFilter = 'video';
+    // ================== UI ==================
+    let ui = null;
+    let miniUI = null;
 
-    function createUI() {
-        if (panel) panel.remove();
+    function buildUI() {
+        if (ui) ui.remove();
 
-        panel = document.createElement('div');
-        panel.id = 'disorbsfarm';
-        panel.style.cssText = 'position:fixed;top:70px;right:18px;z-index:999999;';
+        ui = document.createElement("div");
+        ui.style.cssText = "position:fixed;top:65px;right:16px;z-index:999999;";
 
-        panel.innerHTML = `
-            <div style="background:rgba(28,28,30,0.94);backdrop-filter:blur(42px)saturate(180%);border:1px solid rgba(255,255,255,0.1);border-radius:20px;padding:16px 18px;width:360px;color:#F5F5F7;font-family:-apple-system,BlinkMacSystemFont,sans-serif;box-shadow:0 25px 70px rgba(0,0,0,0.55);">
+        ui.innerHTML = `
+            <div style="width:358px;background:rgba(27,27,29,0.95);backdrop-filter:blur(44px)saturate(190%);border:1px solid rgba(255,255,255,0.09);border-radius:20px;padding:15px 17px;color:#F5F5F7;font-family:-apple-system,BlinkMacSystemFont,sans-serif;box-shadow:0 25px 80px rgba(0,0,0,0.6);">
                 
                 <!-- Header -->
-                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;cursor:move;" id="df-drag">
-                    <div style="display:flex;align-items:center;gap:10px;">
-                        <div style="width:28px;height:28px;background:linear-gradient(135deg,#5E5CE6,#0A84FF);border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:15px;box-shadow:0 3px 10px rgba(10,132,255,0.4);">👓</div>
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:11px;cursor:move;" id="df-drag">
+                    <div style="display:flex;align-items:center;gap:9px;">
+                        <div style="width:26px;height:26px;background:linear-gradient(135deg,#5E5CE6,#0A84FF);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:14px;box-shadow:0 2px 8px rgba(94,92,230,0.4);">👓</div>
                         <div>
-                            <div style="font-weight:700;font-size:17px;letter-spacing:-0.3px;">DisOrbsFarm</div>
-                            <div style="font-size:10px;color:#8E8E93;margin-top:-1px;">v6.0 • Stable</div>
+                            <div style="font-weight:700;font-size:16px;letter-spacing:-0.2px;">DisOrbsFarm</div>
+                            <div style="font-size:9.5px;color:#8E8E93;margin-top:-1px;">v7.0 • Clean</div>
                         </div>
                     </div>
-                    <div style="display:flex;gap:5px;">
-                        <button id="df-min" style="background:rgba(255,255,255,0.1);border:none;border-radius:6px;width:24px;height:24px;font-size:14px;color:#8E8E93;cursor:pointer;">−</button>
-                        <button id="df-set" style="background:rgba(255,255,255,0.1);border:none;border-radius:6px;width:24px;height:24px;font-size:13px;cursor:pointer;">⚙</button>
-                        <button id="df-close" style="background:rgba(255,69,58,0.18);color:#FF453A;border:none;border-radius:50%;width:22px;height:22px;font-size:13px;font-weight:700;cursor:pointer;">✕</button>
+                    <div style="display:flex;gap:4px;">
+                        <button id="df-min" style="width:23px;height:23px;background:rgba(255,255,255,0.1);border:none;border-radius:6px;font-size:13px;color:#8E8E93;cursor:pointer;">−</button>
+                        <button id="df-set" style="width:23px;height:23px;background:rgba(255,255,255,0.1);border:none;border-radius:6px;font-size:12px;cursor:pointer;">⚙</button>
+                        <button id="df-x" style="width:21px;height:21px;background:rgba(255,69,58,0.2);color:#FF453A;border:none;border-radius:50%;font-size:12px;font-weight:700;cursor:pointer;">✕</button>
                     </div>
                 </div>
 
                 <!-- Stats -->
-                <div style="display:flex;gap:6px;margin-bottom:10px;">
-                    <div style="flex:1;background:rgba(255,255,255,0.06);border-radius:10px;padding:7px 9px;font-size:10px;">
+                <div style="display:flex;gap:5px;margin-bottom:9px;">
+                    <div style="flex:1;background:rgba(255,255,255,0.055);border-radius:9px;padding:6px 8px;font-size:10px;">
                         <div style="color:#8E8E93;">КВЕСТОВ</div>
-                        <div id="df-stat-quests" style="font-weight:700;font-size:15px;">0</div>
+                        <div id="df-qcount" style="font-weight:700;font-size:15px;">0</div>
                     </div>
-                    <div style="flex:1;background:rgba(255,255,255,0.06);border-radius:10px;padding:7px 9px;font-size:10px;">
+                    <div style="flex:1;background:rgba(255,255,255,0.055);border-radius:9px;padding:6px 8px;font-size:10px;">
                         <div style="color:#8E8E93;">ВРЕМЯ</div>
-                        <div id="df-stat-time" style="font-weight:700;font-size:15px;">00:00</div>
+                        <div id="df-time" style="font-weight:700;font-size:15px;">00:00</div>
                     </div>
                 </div>
 
                 <!-- Settings -->
-                <div id="df-settings" style="display:none;background:rgba(20,20,22,0.96);border-radius:12px;padding:12px;margin-bottom:10px;font-size:12px;border:1px solid rgba(255,255,255,0.1);">
-                    <div style="margin-bottom:8px;">
-                        <div style="color:#8E8E93;margin-bottom:3px;font-size:11px;">Режим работы</div>
-                        <select id="df-mode" style="width:100%;padding:6px 8px;border-radius:7px;background:#2b2d31;color:#fff;border:1px solid #3f4147;">
-                            <option value="1">⚡ Максимальная скорость</option>
-                            <option value="2" selected>⚖ Баланс (рекомендуется)</option>
-                            <option value="3">🛡 Максимальная безопасность</option>
+                <div id="df-settings" style="display:none;background:rgba(19,19,21,0.97);border-radius:11px;padding:11px;margin-bottom:9px;font-size:12px;border:1px solid rgba(255,255,255,0.08);">
+                    <div style="margin-bottom:7px;">
+                        <div style="color:#8E8E93;margin-bottom:3px;font-size:11px;">Режим</div>
+                        <select id="df-level" style="width:100%;padding:5px 7px;border-radius:6px;background:#2b2d31;color:#fff;border:1px solid #3f4147;">
+                            <option value="1">⚡ Быстрый</option>
+                            <option value="2" selected>⚖ Баланс</option>
+                            <option value="3">🛡 Безопасный</option>
                         </select>
                     </div>
 
-                    <div style="display:grid;grid-template-columns:1fr;gap:6px;margin-bottom:8px;">
-                        <label style="display:flex;align-items:center;gap:6px;"><input type="checkbox" id="df-enroll" checked> Автопринятие квестов</label>
-                        <label style="display:flex;align-items:center;gap:6px;"><input type="checkbox" id="df-claim"> Автоклейм <span style="color:#FF453A;font-size:10px;">(риск)</span></label>
-                        <label style="display:flex;align-items:center;gap:6px;"><input type="checkbox" id="df-nopause"> Убрать паузы между квестами <span style="color:#FF9F0A;font-size:10px;">(риск)</span></label>
-                        <label style="display:flex;align-items:center;gap:6px;"><input type="checkbox" id="df-notify" checked> Уведомления при завершении</label>
-                    </div>
+                    <label style="display:flex;align-items:center;gap:5px;margin:2px 0;"><input type="checkbox" id="df-enroll" checked> Автопринятие</label>
+                    <label style="display:flex;align-items:center;gap:5px;margin:2px 0;"><input type="checkbox" id="df-claim"> Автоклейм <span style="color:#FF453A;font-size:9.5px;">(риск)</span></label>
+                    <label style="display:flex;align-items:center;gap:5px;margin:2px 0;"><input type="checkbox" id="df-nopause"> Без пауз <span style="color:#FF9F0A;font-size:9.5px;">(риск)</span></label>
+                    <label style="display:flex;align-items:center;gap:5px;margin:2px 0;"><input type="checkbox" id="df-notify" checked> Уведомления</label>
 
-                    <div>
-                        <div style="color:#8E8E93;margin-bottom:3px;font-size:11px;">Скорость видео</div>
-                        <input type="range" id="df-speed" min="1.5" max="12" step="0.5" value="4" style="width:100%;">
-                        <div style="display:flex;justify-content:space-between;font-size:9.5px;color:#8E8E93;margin-top:2px;">
-                            <span>1.5x</span><span id="df-speed-val">4.0x</span><span>12x</span>
-                        </div>
+                    <div style="margin-top:8px;">
+                        <div style="color:#8E8E93;margin-bottom:2px;font-size:11px;">Скорость видео</div>
+                        <input type="range" id="df-speed" min="1.5" max="11" step="0.5" value="4" style="width:100%;">
+                        <div style="display:flex;justify-content:space-between;font-size:9.5px;color:#8E8E93;margin-top:1px;"><span>1.5</span><span id="df-spval">4.0</span><span>11</span></div>
                     </div>
                 </div>
 
                 <!-- Filters -->
-                <div style="display:flex;gap:5px;margin-bottom:8px;">
-                    <button id="df-video" style="flex:1;padding:6px 0;border-radius:8px;border:none;background:#0A84FF;color:white;font-size:11px;font-weight:600;">🎬 Видео</button>
-                    <button id="df-game" style="flex:1;padding:6px 0;border-radius:8px;border:none;background:rgba(255,255,255,0.1);color:#F5F5F7;font-size:11px;font-weight:500;">🎮 Игры</button>
-                    <button id="df-refresh" style="padding:6px 10px;border-radius:8px;border:1px solid rgba(255,255,255,0.15);background:rgba(255,255,255,0.06);color:#F5F5F7;font-size:13px;cursor:pointer;">🔄</button>
+                <div style="display:flex;gap:4px;margin-bottom:7px;">
+                    <button id="df-fvideo" style="flex:1;padding:5.5px 0;border-radius:7px;border:none;background:#0A84FF;color:white;font-size:11px;font-weight:600;">🎬 Видео</button>
+                    <button id="df-fgame" style="flex:1;padding:5.5px 0;border-radius:7px;border:none;background:rgba(255,255,255,0.1);color:#F5F5F7;font-size:11px;font-weight:500;">🎮 Игры</button>
+                    <button id="df-refresh" style="padding:5.5px 9px;border-radius:7px;border:1px solid rgba(255,255,255,0.15);background:rgba(255,255,255,0.06);color:#F5F5F7;font-size:12px;cursor:pointer;">🔄</button>
                 </div>
 
-                <div id="df-status" style="font-size:11px;color:#8E8E93;margin-bottom:4px;">Готов к работе</div>
-                <div style="background:rgba(255,255,255,0.08);border-radius:999px;height:4px;margin-bottom:8px;"><div id="df-bar" style="background:linear-gradient(#0A84FF,#5E5CE6);height:100%;width:0%;transition:width .35s;border-radius:999px;"></div></div>
+                <div id="df-status" style="font-size:10.5px;color:#8E8E93;margin-bottom:3px;">Готов</div>
+                <div style="background:rgba(255,255,255,0.07);border-radius:999px;height:3.5px;margin-bottom:7px;"><div id="df-bar" style="background:linear-gradient(#0A84FF,#5E5CE6);height:100%;width:0%;transition:width .3s;border-radius:999px;"></div></div>
 
-                <div id="df-list" style="max-height:160px;overflow-y:auto;font-size:12px;margin-bottom:10px;"></div>
+                <div id="df-list" style="max-height:158px;overflow-y:auto;font-size:11.5px;margin-bottom:9px;"></div>
 
-                <div style="display:flex;gap:8px;">
-                    <button id="df-start" style="flex:1;background:#0A84FF;color:white;border:none;border-radius:10px;padding:11px 0;font-weight:700;font-size:14px;cursor:pointer;">🚀 СТАРТ</button>
-                    <button id="df-stop" style="flex:1;background:rgba(255,255,255,0.1);color:#F5F5F7;border:1px solid rgba(255,255,255,0.2);border-radius:10px;padding:11px 0;font-weight:700;font-size:14px;cursor:pointer;display:none;">⏹ СТОП</button>
+                <div style="display:flex;gap:7px;">
+                    <button id="df-start" style="flex:1;background:#0A84FF;color:white;border:none;border-radius:9px;padding:10px 0;font-weight:700;font-size:13.5px;cursor:pointer;">СТАРТ</button>
+                    <button id="df-stop" style="flex:1;background:rgba(255,255,255,0.1);color:#F5F5F7;border:1px solid rgba(255,255,255,0.2);border-radius:9px;padding:10px 0;font-weight:700;font-size:13.5px;cursor:pointer;display:none;">СТОП</button>
                 </div>
 
-                <div style="margin-top:10px;text-align:center;font-size:9px;color:#636366;">Только для образовательных целей • © 2026 KDStudio</div>
+                <div style="margin-top:8px;text-align:center;font-size:8.5px;color:#636366;">Только для образовательных целей • © 2026 KDStudio</div>
             </div>
         `;
 
-        document.body.appendChild(panel);
+        document.body.appendChild(ui);
 
         // Drag
-        let dragging = false, ox = 0, oy = 0;
-        const drag = panel.querySelector('#df-drag');
-        drag.onmousedown = e => {
-            dragging = true;
-            const r = panel.getBoundingClientRect();
+        let drag = false, ox = 0, oy = 0;
+        const handle = ui.querySelector("#df-drag");
+        handle.onmousedown = e => {
+            drag = true;
+            const r = ui.getBoundingClientRect();
             ox = e.clientX - r.left;
             oy = e.clientY - r.top;
-            panel.style.right = 'auto';
-            panel.style.left = r.left + 'px';
-            panel.style.top = r.top + 'px';
+            ui.style.right = "auto";
+            ui.style.left = r.left + "px";
+            ui.style.top = r.top + "px";
         };
-        document.addEventListener('mousemove', e => {
-            if (dragging) {
-                panel.style.left = (e.clientX - ox) + 'px';
-                panel.style.top = (e.clientY - oy) + 'px';
-            }
-        });
-        document.addEventListener('mouseup', () => dragging = false);
+        document.addEventListener("mousemove", e => { if (drag) { ui.style.left = (e.clientX - ox) + "px"; ui.style.top = (e.clientY - oy) + "px"; } });
+        document.addEventListener("mouseup", () => drag = false);
 
-        setupUI();
+        ui.querySelector("#df-min").onclick = minimizeUI;
+        setupInterface();
     }
 
-    function setupUI() {
-        const list = panel.querySelector('#df-list');
-        const fVideo = panel.querySelector('#df-video');
-        const fGame = panel.querySelector('#df-game');
-        const refresh = panel.querySelector('#df-refresh');
-        const settings = panel.querySelector('#df-settings');
-        const setBtn = panel.querySelector('#df-set');
+    function setupInterface() {
+        const listEl = ui.querySelector("#df-list");
+        const fVideo = ui.querySelector("#df-fvideo");
+        const fGame = ui.querySelector("#df-fgame");
+        const ref = ui.querySelector("#df-refresh");
+        const settingsBox = ui.querySelector("#df-settings");
+        const setBtn = ui.querySelector("#df-set");
 
-        function render() {
-            list.innerHTML = '';
-            let filtered = quests;
-            if (currentFilter === 'video') filtered = quests.filter(q => q.isVideo);
-            else if (currentFilter === 'game') filtered = quests.filter(q => q.isGame);
+        function drawList() {
+            listEl.innerHTML = "";
+            let filtered = list;
+            if (currentFilter === "video") filtered = list.filter(q => q.video);
+            else if (currentFilter === "game") filtered = list.filter(q => q.game);
 
             filtered.forEach(q => {
-                const div = document.createElement('div');
-                div.style.cssText = 'padding:6px 8px;border-bottom:1px solid rgba(255,255,255,0.06);display:flex;align-items:center;gap:8px;';
-                const checked = selected.has(q.id) ? 'checked' : '';
+                const row = document.createElement("div");
+                row.style.cssText = "padding:5px 7px;border-bottom:1px solid rgba(255,255,255,0.05);display:flex;align-items:center;gap:7px;";
+                const isChecked = chosen.has(q.id) ? "checked" : "";
                 const pct = q.needed > 0 ? Math.floor((q.done / q.needed) * 100) : 0;
 
-                div.innerHTML = `
-                    <input type="checkbox" ${checked} style="accent-color:#0A84FF;width:15px;height:15px;">
+                row.innerHTML = `
+                    <input type="checkbox" ${isChecked} style="accent-color:#0A84FF;width:15px;height:15px;">
                     <div style="flex:1;min-width:0;">
-                        <div style="font-weight:600;font-size:12px;">${q.isVideo ? '🎬' : '🎮'} ${q.name}</div>
-                        <div style="height:3px;background:rgba(255,255,255,0.1);border-radius:999px;margin-top:3px;"><div style="height:100%;width:${pct}%;background:linear-gradient(#0A84FF,#5E5CE6);border-radius:999px;"></div></div>
+                        <div style="font-weight:600;font-size:11.5px;">${q.video ? "🎬" : "🎮"} ${q.name}</div>
+                        <div style="height:2.5px;background:rgba(255,255,255,0.1);border-radius:999px;margin-top:2px;"><div style="height:100%;width:${pct}%;background:linear-gradient(#0A84FF,#5E5CE6);border-radius:999px;"></div></div>
                     </div>
-                    <div style="font-size:10px;color:#8E8E93;min-width:44px;text-align:right;">${Math.floor(q.done)}/${q.needed}s</div>
+                    <div style="font-size:9.5px;color:#8E8E93;min-width:42px;text-align:right;">${Math.floor(q.done)}/${q.needed}s</div>
                 `;
 
-                const chk = div.querySelector('input');
-                chk.onchange = () => chk.checked ? selected.add(q.id) : selected.delete(q.id);
-                list.appendChild(div);
+                const chk = row.querySelector("input");
+                chk.onchange = () => chk.checked ? chosen.add(q.id) : chosen.delete(q.id);
+                listEl.appendChild(row);
             });
         }
 
-        render();
+        drawList();
 
-        fVideo.onclick = () => { currentFilter = 'video'; fVideo.style.background = '#0A84FF'; fVideo.style.color = 'white'; fGame.style.background = 'rgba(255,255,255,0.1)'; fGame.style.color = '#F5F5F7'; render(); };
-        fGame.onclick = () => { currentFilter = 'game'; fGame.style.background = '#0A84FF'; fGame.style.color = 'white'; fVideo.style.background = 'rgba(255,255,255,0.1)'; fVideo.style.color = '#F5F5F7'; render(); };
-        fVideo.style.background = '#0A84FF'; fVideo.style.color = 'white';
+        fVideo.onclick = () => { currentFilter = "video"; fVideo.style.background = "#0A84FF"; fVideo.style.color = "white"; fGame.style.background = "rgba(255,255,255,0.1)"; fGame.style.color = "#F5F5F7"; drawList(); };
+        fGame.onclick = () => { currentFilter = "game"; fGame.style.background = "#0A84FF"; fGame.style.color = "white"; fVideo.style.background = "rgba(255,255,255,0.1)"; fVideo.style.color = "#F5F5F7"; drawList(); };
+        fVideo.style.background = "#0A84FF"; fVideo.style.color = "white";
 
-        refresh.onclick = () => { refreshQuests(); selected.clear(); render(); log('Квесты обновлены', 'info'); };
+        ref.onclick = () => { loadQuests(); chosen.clear(); drawList(); print("Квесты обновлены", "info"); };
 
         let open = false;
-        setBtn.onclick = () => { open = !open; settings.style.display = open ? 'block' : 'none'; };
+        setBtn.onclick = () => { open = !open; settingsBox.style.display = open ? "block" : "none"; };
 
-        // Settings bindings
-        panel.querySelector('#df-mode').onchange = e => applyPreset(parseInt(e.target.value));
-        panel.querySelector('#df-enroll').onchange = e => CONFIG.AUTO_ENROLL = e.target.checked;
-        panel.querySelector('#df-claim').onchange = e => CONFIG.AUTO_CLAIM = e.target.checked;
-        panel.querySelector('#df-nopause').onchange = e => CONFIG.DISABLE_PAUSES = e.target.checked;
-        panel.querySelector('#df-notify').onchange = e => CONFIG.NOTIFICATIONS = e.target.checked;
+        ui.querySelector("#df-level").onchange = e => setLevel(parseInt(e.target.value));
+        ui.querySelector("#df-enroll").onchange = e => CONFIG.autoEnroll = e.target.checked;
+        ui.querySelector("#df-claim").onchange = e => CONFIG.autoClaim = e.target.checked;
+        ui.querySelector("#df-nopause").onchange = e => CONFIG.disablePauses = e.target.checked;
+        ui.querySelector("#df-notify").onchange = e => CONFIG.notifications = e.target.checked;
 
-        const speed = panel.querySelector('#df-speed');
-        const speedVal = panel.querySelector('#df-speed-val');
-        speed.oninput = () => { CONFIG.VIDEO_SPEED = parseFloat(speed.value); speedVal.textContent = CONFIG.VIDEO_SPEED.toFixed(1) + 'x'; };
+        const sp = ui.querySelector("#df-speed");
+        const spv = ui.querySelector("#df-spval");
+        sp.oninput = () => { CONFIG.videoSpeed = parseFloat(sp.value); spv.textContent = CONFIG.videoSpeed.toFixed(1); };
 
-        panel.querySelector('#df-start').onclick = start;
-        panel.querySelector('#df-stop').onclick = () => { stopRequested = true; running = false; };
-        panel.querySelector('#df-close').onclick = () => panel.remove();
-        panel.querySelector('#df-min').onclick = minimize;
+        ui.querySelector("#df-start").onclick = runSession;
+        ui.querySelector("#df-stop").onclick = () => { stopped = true; running = false; };
+        ui.querySelector("#df-x").onclick = () => ui.remove();
     }
 
-    function minimize() {
-        if (!panel) return;
-        panel.style.display = 'none';
-        if (!mini) {
-            mini = document.createElement('div');
-            mini.style.cssText = 'position:fixed;top:22px;right:22px;background:rgba(28,28,30,0.95);backdrop-filter:blur(20px);border:1px solid rgba(255,255,255,0.15);border-radius:999px;padding:5px 12px;display:flex;align-items:center;gap:8px;z-index:999999;';
-            mini.innerHTML = `<div style="display:flex;align-items:center;gap:6px;"><div style="width:18px;height:18px;background:linear-gradient(#5E5CE6,#0A84FF);border-radius:5px;display:flex;align-items:center;justify-content:center;font-size:10px;">👓</div><div style="font-weight:600;font-size:12px;">DisOrbsFarm</div></div><button style="background:#0A84FF;color:white;border:none;border-radius:999px;padding:2px 10px;font-size:10px;font-weight:600;cursor:pointer;">Развернуть</button>`;
-            document.body.appendChild(mini);
-            mini.querySelector('button').onclick = () => { mini.remove(); mini = null; panel.style.display = 'block'; };
+    function minimizeUI() {
+        if (!ui) return;
+        ui.style.display = "none";
+        if (!miniUI) {
+            miniUI = document.createElement("div");
+            miniUI.style.cssText = "position:fixed;top:18px;right:18px;background:rgba(27,27,29,0.96);backdrop-filter:blur(20px);border:1px solid rgba(255,255,255,0.12);border-radius:999px;padding:4px 11px;display:flex;align-items:center;gap:7px;z-index:999999;";
+            miniUI.innerHTML = `<div style="display:flex;align-items:center;gap:5px;"><div style="width:17px;height:17px;background:linear-gradient(#5E5CE6,#0A84FF);border-radius:5px;display:flex;align-items:center;justify-content:center;font-size:9px;">👓</div><div style="font-weight:600;font-size:11.5px;">DisOrbsFarm</div></div><button style="background:#0A84FF;color:white;border:none;border-radius:999px;padding:1px 8px;font-size:9.5px;font-weight:600;cursor:pointer;">Открыть</button>`;
+            document.body.appendChild(miniUI);
+            miniUI.querySelector("button").onclick = () => { miniUI.remove(); miniUI = null; ui.style.display = "block"; };
         }
     }
 
-    function updateProgress(id, pct) {
-        const el = panel?.querySelector(`#df-list > div`);
-        // simple update - можно улучшить при необходимости
+    function updateBar(id, pct) {
+        // Можно улучшить, но для стабильности оставлено минимально
     }
 
-    async function start() {
+    async function runSession() {
         if (running) return;
         running = true;
-        stopRequested = false;
+        stopped = false;
 
-        let queue = quests.filter(q => selected.has(q.id));
-        if (queue.length === 0) queue = quests.slice(0, 5);
+        let toRun = list.filter(q => chosen.has(q.id));
+        if (toRun.length === 0) toRun = list.slice(0, 5);
 
-        panel.querySelector('#df-start').style.display = 'none';
-        panel.querySelector('#df-stop').style.display = 'block';
+        ui.querySelector("#df-start").style.display = "none";
+        ui.querySelector("#df-stop").style.display = "block";
 
-        for (let i = 0; i < queue.length; i++) {
-            if (stopRequested) break;
-            const q = queue[i];
+        for (let i = 0; i < toRun.length; i++) {
+            if (stopped) break;
+            const q = toRun[i];
 
-            const ok = await enroll(q);
+            const ok = await enrollQuest(q);
             if (!ok && !q.enrolled) continue;
 
             try {
-                if (q.isVideo) await runVideo(q);
-                else if (q.isGame) await runGame(q);
+                if (q.video) await doVideo(q);
+                else if (q.game) await doGame(q);
             } catch (e) {
-                log(`Ошибка: ${e.message}`, 'error');
+                print("Ошибка: " + e.message, "error");
             }
 
-            if (!CONFIG.DISABLE_PAUSES && i < queue.length - 1 && !stopRequested) {
-                const p = rand(...CONFIG.PAUSE_BETWEEN_QUESTS);
-                for (let s = p; s > 0 && !stopRequested; s--) {
-                    panel.querySelector('#df-status').textContent = `Пауза ${s}с...`;
+            if (!CONFIG.disablePauses && i < toRun.length - 1 && !stopped) {
+                const p = rand(...CONFIG.pauseRange);
+                for (let s = p; s > 0 && !stopped; s--) {
+                    ui.querySelector("#df-status").textContent = `Пауза ${s}с`;
                     await sleep(1000);
                 }
             }
         }
 
         running = false;
-        panel.querySelector('#df-start').style.display = 'block';
-        panel.querySelector('#df-stop').style.display = 'none';
-        panel.querySelector('#df-status').textContent = `Завершено • ${queue.length} квестов`;
+        ui.querySelector("#df-start").style.display = "block";
+        ui.querySelector("#df-stop").style.display = "none";
+        ui.querySelector("#df-status").textContent = `Готов • ${toRun.length} квестов`;
 
-        notify('DisOrbsFarm', `Завершено ${queue.length} квестов`);
-        log('Сессия завершена', 'success');
+        notify("DisOrbsFarm", `Завершено ${toRun.length} квестов`);
+        print("Сессия завершена", "success");
     }
 
-    // Start UI
-    if (CONFIG.SHOW_UI) {
-        createUI();
-        log('DisOrbsFarm v6.0 готов', 'success');
+    // Запуск
+    if (true) {
+        buildUI();
+        print("DisOrbsFarm v7.0 готов к работе", "success");
     }
 
-    window.closeOrbsFarmer = () => { if (panel) panel.remove(); if (mini) mini.remove(); };
+    window.closeOrbsFarmer = () => { if (ui) ui.remove(); if (miniUI) miniUI.remove(); };
 })();
