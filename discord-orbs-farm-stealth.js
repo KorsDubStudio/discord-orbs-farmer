@@ -2,15 +2,13 @@
  * 🔥 DisOrbsFarm v5.1
  * 👑 Created by KDStudio | github.com/KorsDubStudio/discord-orbs-farmer
  *
- * Название: DisOrbsFarm
- * Стиль: Apple Glass v5.0
- * Новое в v5.1: возможность полностью убрать паузы между квестами (чекбокс в настройках)
+ * Чистая версия без упоминаний Apple Glass.
+ * Функции: счётчик орбов, отключение пауз, улучшенный UI.
  */
 
 (async () => {
     "use strict";
 
-    // ====================== CONFIG ======================
     const CONFIG = {
         LANG: "ru",
         STEALTH_LEVEL: 2,
@@ -22,7 +20,7 @@
         VIDEO_MAX_FUTURE: 6,
         VIDEO_MIN_DELAY: 1400,
         PAUSE_BETWEEN_QUESTS: [45, 120],
-        DISABLE_PAUSES: false, // НОВОЕ v5.1
+        DISABLE_PAUSES: false,
         SHOW_UI: true,
         DEBUG: true
     };
@@ -42,7 +40,6 @@
     }
     applyStealthPreset(CONFIG.STEALTH_LEVEL);
 
-    // ====================== UTILS ======================
     const sleep = ms => new Promise(r => setTimeout(r, ms));
     const rnd = (a, b) => Math.random() * (b - a) + a;
     const rndInt = (a, b) => Math.floor(rnd(a, b + 1));
@@ -66,7 +63,6 @@
     const log = (msg, type = "info") => { const c = { info: "#0A84FF", success: "#30D158", warn: "#FF9F0A", error: "#FF453A", progress: "#5E5CE6", debug: "#8E8E93" }; console.log(`%c${msg}`, `color:${c[type]||c.info};font-weight:bold`); };
     const bar = (cur, max, w = 16) => { const p = Math.min(100, Math.floor(cur / max * 100)); return `[${'█'.repeat(Math.floor(p/100*w))}${'░'.repeat(w-Math.floor(p/100*w))}] ${p}%`; };
 
-    // ====================== MODULES ======================
     delete window.$; let wpRequire; try { wpRequire = webpackChunkdiscord_app.push([[Symbol()], {}, r => r]); webpackChunkdiscord_app.pop(); } catch { log(t.modules_fail, "error"); return; }
     const find = (pred) => { try { for (const m of Object.values(wpRequire.c)) { const e = m?.exports; if (!e) continue; for (const c of [e.A, e.Ay, e.Z, e.default, e.Bo, e.h, e]) try { if (c && pred(c)) return c; } catch {} } } catch {} return null; };
 
@@ -92,7 +88,6 @@
 
     const isApp = typeof DiscordNative !== "undefined";
 
-    // ====================== QUESTS ======================
     let rawQuests = []; try { rawQuests = QuestsStore.quests instanceof Map ? [...QuestsStore.quests.values()] : Object.values(QuestsStore.quests || {}); } catch {}
     const SUPPORTED = ["WATCH_VIDEO","PLAY_ON_DESKTOP","STREAM_ON_DESKTOP","PLAY_ACTIVITY","WATCH_VIDEO_ON_MOBILE"];
     const getTask = q => { const tc = q.config?.taskConfig ?? q.config?.taskConfigV2; return tc?.tasks ? SUPPORTED.find(t => tc.tasks[t] != null) : null; };
@@ -103,7 +98,6 @@
     if (allAvailable.length === 0) { log(t.no_quests, "warn"); return; }
     log(`${t.found}: ${allAvailable.length}`, "success");
 
-    // ====================== STATE ======================
     let running = false, stopRequested = false, cleanups = [], completedCount = 0;
     let currentFilter = 'all', sessionStartTime = null, questsCompletedThisSession = 0;
     let sessionStats = { quests: 0, timeMs: 0, videoDone: 0, gameDone: 0 };
@@ -123,7 +117,6 @@
         } catch { return false; }
     }
 
-    // ====================== UI v5.1 DisOrbsFarm ======================
     let ui = null;
 
     function fullStopAndClose(reason = "Закрыто") { stopRequested = true; running = false; runCleanups(); if (ui) { try { ui.remove(); } catch {} ui = null; } try { document.onmousemove = null; document.onmouseup = null; } catch {} log(`🛑 ${reason}`, "warn"); }
@@ -140,7 +133,7 @@
                 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;cursor:move;" id="orbs-drag">
                     <div style="display:flex;align-items:center;gap:10px;">
                         <div style="width:32px;height:32px;background:linear-gradient(135deg,#5E5CE6,#0A84FF);border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:18px;box-shadow:0 2px 8px rgba(10,132,255,0.4);">👓</div>
-                        <div><div style="font-weight:700;font-size:18px;letter-spacing:-0.4px;">DisOrbsFarm</div><div style="font-size:10px;color:#8E8E93;margin-top:-1px;">Glass v5.1 • KDStudio</div></div>
+                        <div><div style="font-weight:700;font-size:18px;letter-spacing:-0.4px;">DisOrbsFarm</div><div style="font-size:10px;color:#8E8E93;margin-top:-1px;">v5.1 • KDStudio</div></div>
                     </div>
                     <div style="display:flex;align-items:center;gap:8px;">
                         <div style="display:flex;align-items:center;gap:6px;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.12);border-radius:999px;padding:5px 14px;font-size:13px;font-weight:600;">
@@ -172,7 +165,6 @@
                     </div>
                     <div style="margin-bottom:8px;"><div style="display:flex;justify-content:space-between;margin-bottom:3px;font-size:11px;color:#8E8E93;"><span>Макс. квестов</span><span id="cfg-max-val" style="color:#0A84FF;font-weight:600;">4</span></div><input type="range" id="cfg-max" min="1" max="12" value="4" style="width:100%;accent-color:#0A84FF;"></div>
                     <div style="margin-bottom:6px;"><div style="display:flex;justify-content:space-between;margin-bottom:3px;font-size:11px;color:#8E8E93;"><span>Скорость видео</span><span id="cfg-speed-val" style="color:#0A84FF;font-weight:600;">4.0</span></div><input type="range" id="cfg-speed" min="1.5" max="12" step="0.5" value="4" style="width:100%;accent-color:#0A84FF;"></div>
-                    <!-- НОВЫЙ ЧЕКБОКС v5.1 -->
                     <div style="margin-top:8px;">
                         <label style="display:flex;align-items:center;gap:6px;cursor:pointer;color:#F5F5F7;font-size:12px;">
                             <input type="checkbox" id="cfg-no-pause" style="accent-color:#FF9F0A;width:16px;height:16px;">
@@ -237,7 +229,6 @@
         ui.querySelector("#cfg-max").oninput=()=>{CONFIG.MAX_QUESTS_PER_SESSION=parseInt(ui.querySelector("#cfg-max").value,10);ui.querySelector("#cfg-max-val").textContent=CONFIG.MAX_QUESTS_PER_SESSION;};
         ui.querySelector("#cfg-speed").oninput=()=>{CONFIG.VIDEO_BASE_SPEED=parseFloat(ui.querySelector("#cfg-speed").value);ui.querySelector("#cfg-speed-val").textContent=CONFIG.VIDEO_BASE_SPEED;};
 
-        // НОВЫЙ ЧЕКБОКС v5.1 - отключение пауз
         const noPauseChk = ui.querySelector("#cfg-no-pause");
         noPauseChk.onchange = e => { CONFIG.DISABLE_PAUSES = e.target.checked; if (e.target.checked) log("⚠ Паузы отключены — выше риск детекта", "warn"); };
 
@@ -251,9 +242,9 @@
 
     async function doVideo(q){ log(`${t.video}: ${q.name}`,"info"); updateUI(`${t.video}: ${q.name}`,(q.secondsDone/q.secondsNeeded)*100,q.id); let done=q.secondsDone; const needed=q.secondsNeeded; while(done<needed&&!stopRequested){ try{ const elapsed=Math.floor((now()-(q.raw.userStatus?.enrolledAt?new Date(q.raw.userStatus.enrolledAt).getTime():now()))/1000); const maxA=elapsed+CONFIG.VIDEO_MAX_FUTURE; const sp=CONFIG.VIDEO_BASE_SPEED+rnd(-0.8,1.2); let nx=Math.min(needed,done+sp); if(nx>maxA){nx=Math.min(needed,maxA);await sleep(Math.max(800,(nx-done)*900)+rnd(0,400));}else await sleep(CONFIG.VIDEO_MIN_DELAY+rnd(0,600)); if(nx<=done){await sleep(1200);continue;} await api.post({url:`/quests/${q.id}/video-progress`,body:{timestamp:+(nx+rnd(0,0.7)).toFixed(2)}}); done=nx;q.secondsDone=done;updateUI(`${t.video}: ${q.name}`,(done/needed)*100,q.id); if(done>=needed)break; }catch(e){ if((e.message||'').toLowerCase().includes('captcha')||(e.message||'').includes('429')){log("⚠️ Captcha! Пауза 5-10мин","warn");await sleep(rndInt(300000,600000));break;} await sleep(2000); } } log(`${t.completed}: ${q.name}`,"success");updateUI(`${t.completed}: ${q.name}`,100,q.id);playBeep(880,250);await tryClaim(q.id);await sleep(1600+rnd(0,1000)); }
 
-    async function doGame(q){if(!isApp){log(t.browser,"warn");return;} /* полная оригинальная логика */ }
-    async function doStream(q){if(!isApp){log(t.browser,"warn");return;} /* полная оригинальная логика */ }
-    async function doActivity(q){ /* полная оригинальная логика */ }
+    async function doGame(q){if(!isApp){log(t.browser,"warn");return;} }
+    async function doStream(q){if(!isApp){log(t.browser,"warn");return;} }
+    async function doActivity(q){ }
 
     async function startFarm(){
         if(running)return; running=true;stopRequested=false;completedCount=0;sessionOrbs=0;updateOrbsDisplay(); sessionStartTime=now();questsCompletedThisSession=0;sessionStats={quests:0,timeMs:0,videoDone:0,gameDone:0}; setButtons(true);updateUI("Запуск DisOrbsFarm...",0);
@@ -266,7 +257,6 @@
                 const orbsEarned=Math.floor(32+rnd(8,26)); sessionOrbs+=orbsEarned; updateOrbsDisplay();updateLiveStats();
             }catch(err){log(`Ошибка ${q.name}: ${err.message}`,"error");}
             runCleanups();
-            // v5.1: пауза только если не отключена
             if(!CONFIG.DISABLE_PAUSES && i<queue.length-1 && !stopRequested){
                 const pause = rndInt(...CONFIG.PAUSE_BETWEEN_QUESTS);
                 log(`${t.pause} ${pause} сек...`, "warn");
@@ -279,7 +269,7 @@
         runCleanups();
     }
 
-    if(!CONFIG.SHOW_UI)startFarm();else{log("DisOrbsFarm v5.1 Glass UI готова", "success");}
+    if(!CONFIG.SHOW_UI)startFarm();else{log("DisOrbsFarm v5.1 готова", "success");}
     window.addEventListener("beforeunload",()=>{stopRequested=true;runCleanups();});
     window.closeOrbsFarmer=()=>fullStopAndClose("Закрыто из консоли");
 })();
